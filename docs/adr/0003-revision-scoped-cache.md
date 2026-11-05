@@ -1,6 +1,6 @@
 # ADR 0003: revision-scoped Redis semantic cache
 
-- **Status:** Accepted; similarity threshold provisional
+- **Status:** Accepted; threshold measured on eight fixed pairs
 - **Date:** 2026-11-05
 
 ## Context
@@ -13,7 +13,7 @@ Store only validated grounded answers together with their evidence passages and 
 
 ## Consequences
 
-Revision scoping makes stale entries unreachable after active-index change even if deletion fails. Grounded response/evidence pairs preserve citations on a hit. A Redis key scan and in-process cosine comparisons are simple for a small corpus but do not scale to high volume; a vector index or bounded candidate index would be needed. A failed flush can leave old entries consuming memory until TTL. No threshold sweep or false-hit measurement exists yet, so 0.96 is conservative configuration, not a tuned result.
+Revision scoping makes stale entries unreachable after active-index change even if deletion fails. Grounded response/evidence pairs preserve citations on a hit. A Redis key scan and in-process cosine comparisons are simple for a small corpus but do not scale to high volume; a vector index or bounded candidate index would be needed. A failed flush can leave old entries consuming memory until TTL. The measured eight-pair study in docs/evidence/cache-sweep.json found two false hits at 0.90 and one at 0.94. Retain 0.96: it had zero false hits, but missed all four paraphrases. This is a safety tradeoff on a small sample; it does not demonstrate broad semantic-cache effectiveness. See docs/PIPELINE.md for the complete threshold table.
 
 ## Alternatives considered
 
@@ -21,3 +21,4 @@ Revision scoping makes stale entries unreachable after active-index change even 
 - Redis vector search: more scalable, but adds index configuration and module dependency.
 - Flush-only invalidation: incomplete if a flush fails; therefore revision scoping is primary.
 - Cache all responses: rejected because follow-ups and abstentions are especially context-sensitive.
+
