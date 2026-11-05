@@ -1,0 +1,58 @@
+name: CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Immutable image tag (the 40-character CI commit SHA)
+        required: true
+        type: string
+      confirm_deploy:
+        description: Confirm deployment to the protected production environment
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: inputs.confirm_deploy == true
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate image tag and required settings
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          API_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY }}
+          INDEXER_REPOSITORY: ${{ vars.INDEXER_IMAGE_REPOSITORY }}
+          UI_REPOSITORY: ${{ vars.UI_IMAGE_REPOSITORY }}
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$API_REPOSITORY"
+          test -n "$INDEXER_REPOSITORY"
+          test -n "$UI_REPOSITORY"
+          test -n "$KUBECONFIG_B64"
+      - name: Configure cluster access
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "$KUBECONFIG_B64" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      - name: Apply manifests and immutable images
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          API_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY }}
+          INDEXER_REPOSITORY: ${{ vars.INDEXER_IMAGE_REPOSITORY }}
+          UI_REPOSITORY: ${{ vars.UI_IMAGE_REPOSITORY }}
+        run: |
+          kubectl apply -k k8s/overlays/prod
+          kubectl set image deployment/api api="$API_REPOSITORY:$IMAGE_TAG" -n rahbar
+          kubectl set image deployment/ui ui="$UI_REPOSITORY:$IMAGE_TAG" -n rahbar
+          kubectl set image cronjob/reindex indexer="$INDEXER_REPOSITORY:$IMAGE_TAG" -n rahbar
+          kubectl rollout status deployment/api -n rahbar --timeout=10m
+          kubectl rollout status deployment/ui -n rahbar --timeout=5m
+          kubectl get endpoints,hpa -n rahbar
