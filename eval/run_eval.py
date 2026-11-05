@@ -92,6 +92,8 @@ def summarise(rows: list[dict]) -> dict:
     by_type: dict[str, list[float]] = {}
     citation_valid = 0
     citation_total = 0
+    expected_term_correct = 0
+    expected_term_total = 0
     abstain_correct = 0
     abstain_total = 0
     details = []
@@ -114,12 +116,19 @@ def summarise(rows: list[dict]) -> dict:
         if row.get("must_abstain"):
             abstain_total += 1
             abstain_correct += not bool(response.get("answered_from_context", False))
+        expected = row.get("expect")
+        expected_match = None
+        if expected:
+            expected_term_total += 1
+            expected_match = str(expected).casefold() in str(response.get("answer", "")).casefold()
+            expected_term_correct += expected_match
         details.append({
             "id": row.get("id"),
             "type": row.get("type", "ordinary"),
             "recall_at_3": r3,
             "recall_at_5": r5,
             "citation_validity": validity,
+            "expected_term_match": expected_match,
             "abstention_correct": (
                 not bool(response.get("answered_from_context", False))
                 if row.get("must_abstain") else None
@@ -138,6 +147,11 @@ def summarise(rows: list[dict]) -> dict:
         "must_abstain_total": abstain_total,
         "citation_valid": citation_valid,
         "citation_total": citation_total,
+        "expected_term_accuracy": (
+            expected_term_correct / expected_term_total if expected_term_total else None
+        ),
+        "expected_term_correct": expected_term_correct,
+        "expected_term_total": expected_term_total,
         "per_question": details,
     }
 
