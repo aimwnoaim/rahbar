@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            api/requirements-dev.txt
+            indexer/requirements-dev.txt
+      - name: Install project tools
+        run: python -m pip install -r api/requirements-dev.txt -r indexer/requirements-dev.txt
+      - name: Lint and type check
+        run: |
+          ruff check api indexer eval corpus
+          (cd api && mypy app)
+          (cd indexer && mypy pipeline)
+      - name: Unit and evaluation gate tests
+        run: |
+          (cd api && pytest -q)
+          (cd indexer && pytest -q)
+          (cd eval && pytest -q)
+      - name: Validate rendered Kubernetes manifests
+        run: |
+          for overlay in dev prod; do
+            kubectl kustomize "k8s/overlays/$overlay" \
+              | docker run --rm -i ghcr.io/yannh/kubeconform:v0.6.7 -strict -summary -
+          done
+
+  cluster-smoke:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: rahbar-ci
+      - name: Build and load local images
+        run: |
+          docker build -t rahbar-api:dev -t rahbar-api:${{ github.sha }} api
+          docker build -t rahbar-indexer:dev -t rahbar-indexer:${{ github.sha }} indexer
+          docker build -t rahbar-ui:dev -t rahbar-ui:${{ github.sha }} ui
+          kind load docker-image rahbar-api:dev rahbar-indexer:dev rahbar-ui:dev --name rahbar-ci
+      - name: Scan images
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.1 image --exit-code 1 --severity HIGH,CRITICAL rahbar-api:dev
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.1 image --exit-code 1 --severity HIGH,CRITICAL rahbar-indexer:dev
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.58.1 image --exit-code 1 --severity HIGH,CRITICAL rahbar-ui:dev
+      - name: Deploy the stub indexer Job and workloads
+        run: |
+          kubectl apply -k k8s/overlays/dev
+          kubectl rollout status statefulset/chroma -n rahbar --timeout=5m
+          kubectl rollout status deployment/redis -n rahbar --timeout=3m
+          kubectl wait --for=condition=complete job/indexer -n rahbar --timeout=5m
+          kubectl rollout status deployment/api -n rahbar --timeout=5m
+          kubectl rollout status deployment/ui -n rahbar --timeout=3m
+          kubectl get endpoints -n rahbar
+          kubectl get hpa -n rahbar
+      - name: Smoke test question endpoint
+        run: |
+          kubectl port-forward service/api 8000:8000 -n rahbar >/tmp/rahbar-port-forward.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8000/readyz >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8000/healthz
+          curl --fail -X POST http://127.0.0.1:8000/api/ask \
+            -H 'Content-Type: application/json' \
+            -d '{"question":"What does the stub handbook say?"}'
