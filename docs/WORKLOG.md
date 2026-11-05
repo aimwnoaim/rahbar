@@ -118,3 +118,11 @@ This log is the reviewable record of implementation, verification, assumptions a
 - GitHub Actions run [42083260429](https://github.com/momnakhan24/rahbar/actions/runs/42083260429) on commit `daff3ae` completed successfully: both `quality` and `cluster-smoke` passed.
 - Observed checks include lint/type checks, unit/evaluation-gate tests, manifest validation, image builds, all three Trivy gates, Chroma/Redis/API/UI rollout, dummy indexer Job completion, and HTTP question endpoint smoke test.
 - The bounded Chroma connection wait cleared the remaining indexer startup failure. Each implementation/workflow change and its log update was committed separately. This is evidence for the dev stub CI path, not real-model retrieval quality or a production deployment.
+
+### Full assignment execution started
+
+- User authorized Minikube installation and completing remaining assignment work; Docker Hub namespace: `aimwnoaim`.
+- Docker Desktop Linux engine responds with version 29.8.0. Installed Minikube 1.39.0 through the official Winget package. Provisioning isolated profile `rahbar` with Docker, Calico, 4 CPUs, 4096 MB, metrics-server and ingress; other running projects are left intact.
+- Local immutable image builds and a local Ollama model service download are underway. No new live evaluation results are claimed yet.
+- Re-read the assignment: the existing CI smoke path does not yet satisfy fixture retrieval evaluation, and existing manual CD does not satisfy the required push-to-main test/build-push/deploy chain. These gaps must be addressed, in addition to real evaluation, experiments and evidence.
+- Submission checker currently reports 162 passes, 3 warnings and 1 evidence-bundle failure; passing that checker alone is not assignment completion.
