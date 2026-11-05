@@ -64,6 +64,13 @@ jobs:
       - name: Deploy the stub indexer Job and workloads
         run: |
           kubectl apply -k k8s/overlays/dev
+          if ! kubectl wait --for=condition=ready pod/chroma-0 -n rahbar --timeout=90s; then
+            kubectl get pods,pvc -n rahbar -o wide || true
+            kubectl describe pod chroma-0 -n rahbar || true
+            kubectl logs chroma-0 -n rahbar --all-containers=true --tail=100 || true
+            kubectl get events -n rahbar --sort-by=.lastTimestamp || true
+            exit 1
+          fi
           kubectl rollout status statefulset/chroma -n rahbar --timeout=5m
           kubectl rollout status deployment/redis -n rahbar --timeout=3m
           kubectl wait --for=condition=complete job/indexer -n rahbar --timeout=5m
