@@ -3,6 +3,21 @@ kind: Kustomization
 namespace: rahbar
 resources:
   - ../../base
+patches:
+  - target:
+      version: v1
+      kind: ConfigMap
+      name: rahbar-config
+    patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: rahbar-config
+        namespace: rahbar
+      data:
+        RETRIEVER: chroma
+        LLM_PROVIDER: ollama-host
+        EMBED_MODEL: nomic-embed-text
 images:
   - name: rahbar-api
     newName: DOCKERHUB_USERNAME/rahbar-api
