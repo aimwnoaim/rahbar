@@ -22,7 +22,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 | Golden evaluation | Set and scoring code present; real metrics pending | `eval/golden.yaml` contains 17 real-corpus questions; evaluator reports exact expected-term accuracy in addition to recall/citations/abstentions. `eval/baseline.json` is an explicit pending marker with null recall, so the regression gate correctly fails. No measured `results.json` exists. Real evaluation remains blocked on indexing/model/cluster access and OCR review. |
 | Assignment documentation and ADRs | Drafted and mapped | Corpus, pipeline, six failure-analysis plans, seven engineering answers, AI disclosure, architecture, and four ADRs are present. Fault-injection plans are not reported as observed incident evidence. |
 | CI/CD | Workflows prepared locally | CI includes tests, Ruff/mypy, Kustomize schema validation, Trivy scans and kind stub smoke deployment. CD is manual, SHA-tagged and uses the protected `production` environment. GitHub-side secrets, environment approvals, workflow execution, registry image publication and actual deploy remain unconfigured/unverified. |
-| Evidence bundle | Not complete | No real branch protection screenshot, blocked-merge evidence, `kubectl top`, endpoint/HPA output or rollout/failure evidence is available. These require GitHub settings and a working cluster. |
+| Evidence bundle | Not complete; capture runbook prepared | [`OPERATIONS.md`](OPERATIONS.md) gives exact commands and evidence names. No real branch protection screenshot, blocked-merge evidence, `kubectl top`, endpoint/HPA output or rollout/failure evidence is available; these require GitHub settings and a working cluster. |
 
 ## Decisions and assumptions
 
@@ -68,6 +68,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 - The latest submission-checker run reported 162 passes, 3 warnings and 1 failure. The sole failure is the five-file evidence bundle (branch protection, blocked merge, `kubectl top`, endpoints and HPA). Warnings are the placeholder Secret heuristic, 44% conventional commit prefixes, and missing measured `eval/results.json`. The baseline file is intentionally a pending marker; it is not reported as a measured baseline.
 - The most recent full test runs passed: API 14, indexer 9 and evaluation 4. Ruff passed; API mypy reported no issues in 23 files; indexer mypy reported no issues in 10 files. Both Kustomize overlays rendered successfully.
 - README now lists the GitHub Environment, secrets, variables, required checks and registry image prerequisites for the manual CD workflow. Those external settings have not been configured from this local-only workspace.
+- Added [`OPERATIONS.md`](OPERATIONS.md) with safe cluster, rollback, failure-injection, GitHub protection and evidence-capture steps; it is a runbook, not evidence of those operations.
 
 ## Assignment completion checklist
 
