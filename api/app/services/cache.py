@@ -37,8 +37,20 @@ class SemanticCache:
         self.client = client
         self.settings = settings
 
+    def invalidate_obsolete_revisions(self, revision: str) -> int:
+        """Delete cache entries for inactive index revisions as a repair after re-index."""
+        namespace = f"rahbar:cache:{self.settings.embed_model}:"
+        active_prefix = f"{namespace}{revision}:"
+        removed = 0
+        for key in self.client.scan_iter(match=namespace + "*"):
+            name = key.decode("utf-8") if isinstance(key, bytes) else key
+            if not name.startswith(active_prefix):
+                removed += int(self.client.delete(key))
+        return removed
+
     def lookup(self, vector: list[float], revision: str) -> tuple[Answer, list[Passage]] | None:
         """Return the most similar stored response only above the configured threshold."""
+        self.invalidate_obsolete_revisions(revision)
         best_similarity = -1.0
         best: dict[str, Any] | None = None
         prefix = f"rahbar:cache:{self.settings.embed_model}:{revision}:"
