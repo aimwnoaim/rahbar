@@ -12,6 +12,11 @@ router = APIRouter()
 log = logging.getLogger("rahbar.health")
 
 
+def embedding_model_mismatch(indexed: str | None, configured: str) -> bool:
+    """Fail readiness if query and collection vectors were built by different models."""
+    return indexed != configured
+
+
 @router.get("/healthz")
 def healthz() -> dict[str, str]:
     """Is the process alive? Must never touch Chroma, Redis or the LLM."""
@@ -38,7 +43,8 @@ def readyz(request: Request, response: Response) -> dict[str, object]:
         count = collection.count()
         checks["chroma"] = {"ok": count > 0, "count": count}
         indexed_model = (collection.metadata or {}).get("embed_model")
-        matches = indexed_model == settings.embed_model
+        mismatch = embedding_model_mismatch(indexed_model, settings.embed_model)
+        matches = not mismatch
         checks["embedding_model"] = {
             "ok": matches,
             "indexed": indexed_model,
