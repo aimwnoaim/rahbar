@@ -3,6 +3,21 @@ kind: Kustomization
 namespace: rahbar
 resources:
   - ../../base
+patches:
+  - target:
+      kind: Job
+      name: indexer
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/args
+        value: ["--dummy"]
+  - target:
+      kind: CronJob
+      name: reindex
+    patch: |-
+      - op: add
+        path: /spec/jobTemplate/spec/template/spec/containers/0/args
+        value: ["--dummy"]
 images:
   - name: rahbar-api
     newName: rahbar-api
