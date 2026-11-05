@@ -37,6 +37,10 @@ spec:
               value: "FALSE"
             - name: IS_PERSISTENT
               value: "TRUE"
+            - name: SQLITE_TMPDIR
+              value: /tmp
+            - name: TMPDIR
+              value: /tmp
           startupProbe:
             httpGet:
               path: /api/v2/heartbeat
@@ -71,6 +75,11 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: data
