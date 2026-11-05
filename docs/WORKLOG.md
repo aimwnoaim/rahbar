@@ -19,7 +19,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 | Corpus and provenance | Audited | Nine listed documents and SHA-256 manifest; seven PDFs total 279 pages, plus two HTML pages. Detailed audit is in [`CORPUS.md`](CORPUS.md). Raw files are ignored and not committed. |
 | Extraction, cleaning, chunking, embedding and store | Implemented; unit-tested in parts | PDF/HTML/Markdown/text parsing, OCR path, cleanup, structure-aware chunks, Ollama embeddings and staged versioned Chroma publish are implemented. 9 indexer tests pass. Full corpus indexing, OCR quality review and live vector-dimension evidence remain. |
 | API retrieval, provider, citations, abstention and cache | Implemented; unit-tested | Chroma retrieval, provider interface, schema validation/retry/fallback, relevance-floor abstention, Redis semantic cache and readiness pin guard are present. 13 API tests pass. No live Chroma, Redis or model requests have been run. |
-| Golden evaluation | Set and scoring code present; real metrics pending | `eval/golden.yaml` contains 17 real-corpus questions; `eval/baseline.json` is an explicit pending-measurement marker with a null recall, so the regression gate correctly fails. No measured `results.json` exists. Real evaluation remains blocked on indexing/model/cluster access and OCR review. |
+| Golden evaluation | Set and scoring code present; real metrics pending | `eval/golden.yaml` contains 17 real-corpus questions; evaluator reports exact expected-term accuracy in addition to recall/citations/abstentions. `eval/baseline.json` is an explicit pending marker with null recall, so the regression gate correctly fails. No measured `results.json` exists. Real evaluation remains blocked on indexing/model/cluster access and OCR review. |
 | Assignment documentation and ADRs | Drafted and mapped | Corpus, pipeline, six failure-analysis plans, seven engineering answers, AI disclosure, architecture, and four ADRs are present. Fault-injection plans are not reported as observed incident evidence. |
 | CI/CD | Workflows prepared locally | CI includes tests, Ruff/mypy, Kustomize schema validation, Trivy scans and kind stub smoke deployment. CD is manual, SHA-tagged and uses the protected `production` environment. GitHub-side secrets, environment approvals, workflow execution, registry image publication and actual deploy remain unconfigured/unverified. |
 | Evidence bundle | Not complete | No real branch protection screenshot, blocked-merge evidence, `kubectl top`, endpoint/HPA output or rollout/failure evidence is available. These require GitHub settings and a working cluster. |
@@ -55,6 +55,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 - Readiness checks active Chroma collection count, configured/indexed embedding model and Redis; liveness avoids dependencies. Structured logs and Prometheus metrics are implemented.
 - Downloaded nine public sources locally; verified source hashes and audited PDF pages. The 2022 entrepreneurship policy has 8 image-only pages; the 2023 undergraduate rules have 24 of 26 pages with negligible text. OCR execution and manual accuracy review remain open.
 - Added 17 real-corpus golden questions covering ordinary, exact, current-version, must-abstain and instruction-injection cases. Relevant sections are based on the current 2026 handbook and parser's `Document` heading for HTML.
+- Evaluation output also reports literal expected-term match accuracy for questions with an `expect` value; this is a diagnostic metric and does not replace human answer review.
 
 ### Tests and static validation
 
@@ -66,6 +67,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 - Indexer mypy passed: no issues found in 10 source files.
 - The latest submission-checker run reported 162 passes, 3 warnings and 1 failure. The sole failure is the five-file evidence bundle (branch protection, blocked merge, `kubectl top`, endpoints and HPA). Warnings are the placeholder Secret heuristic, 44% conventional commit prefixes, and missing measured `eval/results.json`. The baseline file is intentionally a pending marker; it is not reported as a measured baseline.
 - The most recent full test runs passed: API 14, indexer 9 and evaluation 4. Ruff passed; API mypy reported no issues in 23 files; indexer mypy reported no issues in 10 files. Both Kustomize overlays rendered successfully.
+- README now lists the GitHub Environment, secrets, variables, required checks and registry image prerequisites for the manual CD workflow. Those external settings have not been configured from this local-only workspace.
 
 ## Assignment completion checklist
 

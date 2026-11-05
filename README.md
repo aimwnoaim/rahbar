@@ -123,6 +123,18 @@ and a deliberate evaluation run is complete. A tiny offline fixture set is avail
 screenshot, measured resource evidence, and cluster rollout/failure demonstrations remain
 outstanding; see [WORKLOG](docs/WORKLOG.md).
 
+## GitHub Actions setup
+
+CI runs on pushes and pull requests. In repository settings, protect `main` and require the
+`quality` and `cluster-smoke` CI checks before merge. To enable CD, create a protected
+GitHub Environment named `production` with required reviewers, add the base64 kubeconfig as
+the `KUBECONFIG_B64` environment secret, and define `API_IMAGE_REPOSITORY`,
+`INDEXER_IMAGE_REPOSITORY`, and `UI_IMAGE_REPOSITORY` as environment variables. The
+manually triggered CD workflow requires a 40-character image tag and explicit confirmation;
+the matching images must already exist in that registry. This repository workflow does not
+publish images. Do not store credentials or kubeconfigs in the repository. None of these
+GitHub settings are claimed as configured until captured in the evidence bundle.
+
 ## Security and attribution
 
 Secrets are created with `make secret` from an environment variable. Never commit a real
