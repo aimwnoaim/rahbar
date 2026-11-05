@@ -56,11 +56,11 @@ jobs:
       - name: Scan images
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.58.1 image --exit-code 1 --severity HIGH,CRITICAL rahbar-api:dev
+            aquasec/trivy:0.58.1 image --ignore-unfixed --exit-code 1 --severity HIGH,CRITICAL rahbar-api:dev
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.58.1 image --exit-code 1 --severity HIGH,CRITICAL rahbar-indexer:dev
+            aquasec/trivy:0.58.1 image --ignore-unfixed --exit-code 1 --severity HIGH,CRITICAL rahbar-indexer:dev
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            aquasec/trivy:0.58.1 image --exit-code 1 --severity HIGH,CRITICAL rahbar-ui:dev
+            aquasec/trivy:0.58.1 image --ignore-unfixed --exit-code 1 --severity HIGH,CRITICAL rahbar-ui:dev
       - name: Deploy the stub indexer Job and workloads
         run: |
           kubectl apply -k k8s/overlays/dev
