@@ -1,0 +1,63 @@
+"""Tests for extraction, cleaning, and structure-aware chunk metadata."""
+
+from __future__ import annotations
+
+from pipeline.chunk import chunk
+from pipeline.clean import clean
+from pipeline.extract import extract
+from pipeline.models import Document, Page
+
+
+def test_markdown_extraction_removes_front_matter(tmp_path) -> None:
+    source = tmp_path / "rules.md"
+    source.write_text("---\ndoc_version: 2026\nsuperseded: false\n---\n# Rules\n\nClause 1 applies.")
+    result = extract(str(source), "2026", False)
+    assert result.pages[0].text.startswith("# Rules")
+    assert "doc_version" not in result.pages[0].text
+
+
+def test_html_table_rows_keep_cells_separated(tmp_path) -> None:
+    source = tmp_path / "fees.html"
+    source.write_text(
+        "<h1>Fee table</h1><table><tr><th>Program</th><th>Fee</th></tr>"
+        "<tr><td>BS CS</td><td>10,000 per credit hour</td></tr></table>",
+        encoding="utf-8",
+    )
+    result = extract(str(source), "2026", False)
+    assert "Program | Fee" in result.pages[0].text
+    assert "BS CS | 10,000 per credit hour" in result.pages[0].text
+
+
+def test_clean_removes_repeated_page_furniture_but_keeps_clause_text() -> None:
+    doc = Document("rules.pdf", "2026", False, [
+        Page("rules.pdf", 1, "FAST University\n1.1 Rules\nClause A.\nPage 1"),
+        Page("rules.pdf", 2, "FAST University\n1.2 Rules\nClause B.\nPage 2"),
+    ])
+    result = clean(doc)
+    assert "FAST University" not in result.pages[0].text
+    assert "1.1 Rules" in result.pages[0].text
+    assert "Clause B." in result.pages[1].text
+
+
+def test_chunking_preserves_page_section_version_and_overlap() -> None:
+    words = " ".join(f"term{i}" for i in range(35))
+    doc = Document("rules.md", "2026", False, [
+        Page("rules.md", 7, f"# Academic warning\n\n{words}")
+    ])
+    chunks = chunk(doc, size=12, overlap=3)
+    assert len(chunks) >= 3
+    assert all(len(item.text.split()) <= 12 for item in chunks)
+    assert all(item.section == "Academic warning" for item in chunks)
+    assert all(item.page == 7 and item.doc_version == "2026" for item in chunks)
+    assert all(item.metadata()["superseded"] is False for item in chunks)
+    assert set(chunks[0].text.split()[-3:]) & set(chunks[1].text.split()[:3])
+
+
+def test_chunk_rejects_invalid_overlap() -> None:
+    doc = Document("x.md", "v1", False, [Page("x.md", 1, "One sentence.")])
+    try:
+        chunk(doc, size=10, overlap=10)
+    except ValueError as exc:
+        assert "overlap" in str(exc)
+    else:
+        raise AssertionError("invalid overlap was accepted")
