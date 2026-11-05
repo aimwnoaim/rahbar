@@ -6,7 +6,7 @@ import json
 import math
 import re
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from redis import Redis
 
@@ -43,7 +43,7 @@ class SemanticCache:
         best: dict[str, Any] | None = None
         prefix = f"rahbar:cache:{self.settings.embed_model}:{revision}:"
         for key in self.client.scan_iter(match=prefix + "*"):
-            raw = self.client.get(key)
+            raw = cast(str | bytes | None, self.client.get(key))
             if not raw:
                 continue
             try:
