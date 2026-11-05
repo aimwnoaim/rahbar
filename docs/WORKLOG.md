@@ -1,137 +1,94 @@
-# RAHBAR Work Log
+# RAHBAR assignment work log
 
-This file tracks implementation against the assignment. It records concise decision
-summaries, assumptions, verification evidence, and remaining work. It is an engineering
-record, not private internal reasoning.
+This log is the reviewable record of implementation, verification, assumptions and remaining work for Assignment 02. It records concise engineering rationale and evidence, not private chain-of-thought. Status labels distinguish code that exists from behavior actually observed in a running system.
 
 ## Working rules
 
-- Work in the connected local folder only. Do not push or publish changes.
-- Keep `main` untouched. The `.git` directory is read-only in this workspace, so creating
-  a local Git branch is not available here; source files in this folder are writable.
-- Do not claim cluster, CI, corpus, or runtime evidence until it has actually been produced.
-- For assumptions, prefer reversible choices and mark items requiring the team's decision.
-- Assignment deadline: 8 November 2026, 23:59 PKT.
+- Work only in the connected local repository; do not push, publish, merge or open a PR.
+- Keep all assignment changes on the user-requested local `dev` branch; keep each commit limited to one file/change.
+- The configured local Git author for new commits is `momnakhan24 <i243119@isb.nu.edu.pk>`. Earlier commits remain under their original authors; they were not rewritten. This sets commit attribution fields only and does not log into, impersonate, or grant access to a GitHub account. GitHub attribution depends on its account/email verification.
+- Record unknowns as unknown. Source code and rendered YAML are not evidence of a live rollout, measured retrieval quality or protected-branch behavior.
+- Assignment deadline from the handout: 8 November 2026, 23:59 PKT.
 
-## Status summary
+## Current status
 
-| Area | Status | Evidence / next action |
+| Requirement area | Status | What is verified / still needed |
 | --- | --- | --- |
-| Starter kit and repo orientation | Done | Read `STARTER.md`; repo is still the starter kit on `main`. |
-| Kubernetes around stubs | Scaffold drafted; runtime pending | Dockerfiles and dev/prod Kustomize resources are present. `kubectl kustomize` rendered both overlays successfully. Need cluster deployment, image build, probe checks, endpoints, rollout/undo, policy tests, and resource measurements. |
-| RAG extraction, cleaning, chunking, embedding, storage | Implemented draft; verification pending | Five stages drafted; need parser/chunker tests and real fixture run. |
-| API retrieval, generation, cache, abstention, readiness and metrics | Implemented draft; verification pending | Chroma, providers, Redis cache, citations, fallback, readiness and metrics drafted; need API tests and runtime checks. |
-| Corpus | Downloaded; properties pending | Nine sources downloaded locally and hashes generated. Page count, OCR/font scan, table/definitions checks, and golden passages still need verification. |
-| Evaluation | Not started | Golden set before tuning, metrics, baseline and CI gate. |
-| Kubernetes and CI/CD evidence | Not started | Requires usable local cluster and GitHub Actions credentials/settings. |
-| Assignment documentation | In progress | Added README, architecture, ADR 0001, AI disclosure, and this tracker; fill corpus, pipeline, failure, engineering notes and remaining ADRs from observed work. |
+| Local branch and commit organization | Implemented locally | Branch `dev`; new commits use the requested local author metadata and one-file commits. No push occurred. |
+| Kubernetes stub deployment | Manifests and smoke workflow prepared | Both Kustomize overlays render. Docker Desktop engine is unavailable here; no image build, cluster rollout, probes, endpoints, HPA behavior or rollback was observed locally. CI workflow has not run on GitHub. |
+| Corpus and provenance | Audited | Nine listed documents and SHA-256 manifest; seven PDFs total 279 pages, plus two HTML pages. Detailed audit is in [`CORPUS.md`](CORPUS.md). Raw files are ignored and not committed. |
+| Extraction, cleaning, chunking, embedding and store | Implemented; unit-tested in parts | PDF/HTML/Markdown/text parsing, OCR path, cleanup, structure-aware chunks, Ollama embeddings and staged versioned Chroma publish are implemented. 9 indexer tests pass. Full corpus indexing, OCR quality review and live vector-dimension evidence remain. |
+| API retrieval, provider, citations, abstention and cache | Implemented; unit-tested | Chroma retrieval, provider interface, schema validation/retry/fallback, relevance-floor abstention, Redis semantic cache and readiness pin guard are present. 13 API tests pass. No live Chroma, Redis or model requests have been run. |
+| Golden evaluation | Set and scoring code present; real metrics pending | `eval/golden.yaml` contains 17 real-corpus questions; `eval/baseline.json` is an explicit pending-measurement marker with a null recall, so the regression gate correctly fails. No measured `results.json` exists. Real evaluation remains blocked on indexing/model/cluster access and OCR review. |
+| Assignment documentation and ADRs | Drafted and mapped | Corpus, pipeline, six failure-analysis plans, seven engineering answers, AI disclosure, architecture, and four ADRs are present. Fault-injection plans are not reported as observed incident evidence. |
+| CI/CD | Workflows prepared locally | CI includes tests, Ruff/mypy, Kustomize schema validation, Trivy scans and kind stub smoke deployment. CD is manual, SHA-tagged and uses the protected `production` environment. GitHub-side secrets, environment approvals, workflow execution, registry image publication and actual deploy remain unconfigured/unverified. |
+| Evidence bundle | Not complete | No real branch protection screenshot, blocked-merge evidence, `kubectl top`, endpoint/HPA output or rollout/failure evidence is available. These require GitHub settings and a working cluster. |
 
 ## Decisions and assumptions
 
-| Date (PKT) | Decision / assumption | Why | Revisit when |
-| --- | --- | --- | --- |
-| 2026-11-05 | Use the connected Downloads folder as the working copy; make no GitHub writes. | User explicitly connected this folder and said to work locally only. | If the user connects a different folder or asks to publish. |
-| 2026-11-05 | Follow the assignment's staged plan: Kubernetes around stubs first, then real RAG. | The assignment deliberately allocates the first half of the week to cluster plumbing. | If the team/instructor has approved a different order. |
-| 2026-11-05 | Record rationale as concise decision summaries rather than private chain-of-thought. | Keeps the log useful and auditable without exposing hidden reasoning. | Never. |
+| Date (PKT) | Decision / assumption | Reason and limits |
+| --- | --- | --- |
+| 2026-11-05 | Use the connected repository at `C:\Users\HP\Downloads\rahbar-starter\rahbar-starter`; do not push. | The user connected this folder and explicitly requested local-only work. |
+| 2026-11-05 | Continue on branch `dev` and make one file/change per commit. | Explicit user instruction. Each new commit is independently reviewable. |
+| 2026-11-05 | Use the user-provided alternate account name/email only as local Git author metadata for new commits. | The user identified it as their own repo-owner account. Existing commits are not rewritten; no credentials or authenticated GitHub access were provided. |
+| 2026-11-05 | Use FAST-NUCES public documents from the starter source list. | Fits the assignment source and enables plausible exact-term and abstention questions. Web pages can change; manifest hashes establish the retrieved bytes. |
+| 2026-11-05 | Keep current rules as default and permit superseded chunks only when a question asks historically. | Prevent accidental citation of old policy. Historical retrieval still needs a live, reviewed version-pair evaluation. |
+| 2026-11-05 | Use 400/50 approximate word chunks, cache cutoff 0.96, and relevance floor 0.35 provisionally. | Defaults are implementation values, not tuned results. Three chunk sizes, threshold sweeps and false-hit checks have not been run. |
+| 2026-11-05 | Do not fabricate baseline values, resource measurements or evidence screenshots. | They are empirical assignment deliverables and require access to the live runtime/settings. |
 
-## Work entries
+## Work completed
 
-### 2026-11-05 — repository handoff
+### Kubernetes scaffold and deployment path
 
-- Confirmed current folder is the RAHBAR starter repository, clean on `main`, with the
-  GitHub remote set to `momnakhan24/rahbar`.
-- No source files have been edited yet.
-- Attempted to create local branch `codex/assignment-implementation`; Git could not write
-  `.git/refs` because Git metadata is read-only in this workspace. No branch or remote was
-  changed at that time. Later the user approved granular local commits and Git metadata
-  write access; the work was moved to branch `dev` without changing the remote.
-- Read `STARTER.md` and key API/indexer configuration. The repository has no Dockerfiles,
-  Kubernetes manifests, workflows, or real corpus manifest; many core functions remain
-  starter stubs.
+- Added pinned API/indexer/UI Dockerfiles, non-root users, exec-form commands, `.dockerignore` rules, Namespace, Services, Deployments, Chroma StatefulSet/PVC, Redis/PVC, indexer Job/CronJob, Ingress, HPA, service accounts and default-deny/allow NetworkPolicies.
+- Added dev and prod overlays. Dev patches the indexer to dummy mode; prod selects Chroma retrieval, `ollama-host`, and `nomic-embed-text`, and the base Job runs the actual pipeline.
+- Added a persistent corpus PVC and temporary loader Pod example excluded from Kustomize. The README documents corpus copy, one-shot indexing and rollout order. The placeholder Secret is documentation only and is not applied; real secrets are created with `make secret`.
+- Updated capability-drop syntax and UI image command after mechanical checking.
+- **Verification:** `kubectl kustomize k8s/overlays/dev` and `kubectl kustomize k8s/overlays/prod` both exit successfully after the current manifest changes. No Kubernetes API server validation or live workload was available.
+- **Environment blocker:** Docker CLI exists, but `docker info` cannot connect to Docker Desktop's Linux engine. Minikube, kind, Tesseract and Poppler are unavailable in this environment. Do not claim cluster, image, OCR or resource evidence.
 
-### 2026-11-05 — milestone 1: stub-mode deployment scaffold
+### Pipeline, API and corpus
 
-- Added API, indexer, and UI Dockerfiles. Python images pin Python 3.12.8; nginx is
-  unprivileged; Python containers run with a dedicated UID.
-- Added namespace, ConfigMap, workload ServiceAccounts, four ClusterIP Services, API/UI
-  Deployments, Chroma StatefulSet with volumeClaimTemplates, Redis Deployment with PVC,
-  dummy indexer Job and weekly CronJob, Ingress, CPU HPA, and default-deny NetworkPolicies.
-- Added dev/prod overlays, README clean-clone order, architecture overview, ADR 0001, and
-  the AI-assistance disclosure.
-- **Assumptions:** dev uses starter stubs and the `dummy-768` index; local image tags are
-  `dev`; production image names/tags are placeholders for the later CI workflow. The host
-  Ollama NetworkPolicy CIDR is set to the common Minikube Docker gateway
-  `192.168.49.1/32`, which must be checked and adjusted for the actual cluster.
-- **Provisional values:** CPU/memory requests and limits have not been measured. They must
-  not be described as justified until `kubectl top pods` evidence is collected.
-- **Verification:** `kubectl kustomize k8s/overlays/dev` and `kubectl kustomize
-  k8s/overlays/prod` both rendered successfully. No images were built and no cluster was
-  started. Docker Desktop's CLI is present; Minikube is unavailable in the connected
-  environment, so runtime evidence is still open.
+- Implemented PDF/HTML/Markdown/text extraction; OCR fallback on pages with under 25 normalized text characters; PDF and HTML table serialization; repeated page-furniture cleanup; section-aware word chunking with overlap; batched Ollama embeddings; versioned Chroma collection publication and registry switch.
+- Implemented Chroma query embeddings, current-version filtering, historical question heuristic, Ollama and OpenAI-compatible provider classes, schema-constrained JSON, Pydantic validation, one retry, validated citation membership, fallback and low-relevance abstention.
+- Implemented Redis semantic cache with model/revision-scoped keys, seven-day TTL, follow-up and abstention exclusion, re-index invalidation and a deterministic character/4 token estimate in metrics. Cache threshold remains unmeasured.
+- Readiness checks active Chroma collection count, configured/indexed embedding model and Redis; liveness avoids dependencies. Structured logs and Prometheus metrics are implemented.
+- Downloaded nine public sources locally; verified source hashes and audited PDF pages. The 2022 entrepreneurship policy has 8 image-only pages; the 2023 undergraduate rules have 24 of 26 pages with negligible text. OCR execution and manual accuracy review remain open.
+- Added 17 real-corpus golden questions covering ordinary, exact, current-version, must-abstain and instruction-injection cases. Relevant sections are based on the current 2026 handbook and parser's `Document` heading for HTML.
 
-### 2026-11-05 — milestone 2: real pipeline and API draft; corpus retrieval
+### Tests and static validation
 
-- Implemented PDF, HTML, Markdown, and text extraction; page-level OCR when PDF text is
-  missing; PDF table-row serialization; repeated header/footer cleanup; structure-aware
-  word-token chunking with overlap; batched Ollama embeddings; and Chroma versioned index
-  publication through a registry collection. The indexer flushes the Redis DB after
-  switching the active generation so cached answers do not survive re-indexing.
-- Implemented query embeddings, current-version metadata filtering (including a heuristic
-  for explicit historical questions), Ollama JSON-schema output, OpenAI-compatible hosted
-  JSON-schema output, Pydantic citation validation with one retry and a safe fallback,
-  relevance-floor abstention, Redis semantic cache, and Chroma/Redis/model-pin readiness.
-- Added Prometheus counters/histograms for retrieval and generation latency, cache hits,
-  abstentions, fallbacks, and estimated token input/output. Token values currently use a
-  documented character/4 estimate and have not been compared to provider usage fields.
-- Copied the suggested FAST-NUCES source list to `corpus/sources.yaml`; all nine listed
-  URLs returned a document/page. `corpus/MANIFEST.md` and local ignored `corpus/raw/` were
-  generated. The old 2023 policy, current handbook, prospectus rules, Student Handbook,
-  two annual reports, fees/grading pages, and likely scanned policy are included.
-- **Assumptions:** the source list follows the assignment's suggested institution and
-  starter source list; semantic cache starts at `0.96`, relevance floor at `0.35`, and
-  chunking at 400/50 whitespace words. These are provisional only; the assignment requires
-  measured threshold and chunk-size experiments.
-- **Verification:** source downloads and manifest hashes completed. Python 3.13 venv
-  creation succeeded; dependency installation was interrupted after repeated DNS errors
-  to `files.pythonhosted.org`. No test suite, submission checker, OCR run, page-count
-  audit, or live Chroma/Redis/model run has completed. Minikube is unavailable.
-- **Next:** install dependencies when network access is available, run tests/lint/checker,
-  inspect all nine documents for pages/OCR/tables/version pair, then finish corpus and
-  evaluation artifacts. Keep actual cluster and CI evidence explicitly pending.
+- API tests: 14 passed, including citation validation/fallback, abstention, semantic-cache revision pruning, prompt-injection handling and embedding-model mismatch behavior.
+- Indexer tests: 9 passed, covering Markdown front matter, HTML tables, repeated headers, chunk overlap/metadata and invalid configuration.
+- Evaluation tests: 4 passed, covering recall matching, citation validity, abstention and score gates.
+- Ruff: `ruff check api indexer eval corpus` passed.
+- API mypy: `mypy app` passed with no issues in 23 source files.
+- Indexer mypy passed: no issues found in 10 source files.
+- The latest submission-checker run reported 162 passes, 3 warnings and 1 failure. The sole failure is the five-file evidence bundle (branch protection, blocked merge, `kubectl top`, endpoints and HPA). Warnings are the placeholder Secret heuristic, 44% conventional commit prefixes, and missing measured `eval/results.json`. The baseline file is intentionally a pending marker; it is not reported as a measured baseline.
+- The most recent full test runs passed: API 14, indexer 9 and evaluation 4. Ruff passed; API mypy reported no issues in 23 files; indexer mypy reported no issues in 10 files. Both Kustomize overlays rendered successfully.
 
-### 2026-11-05 — local commit organization
+## Assignment completion checklist
 
-- Created local branch `dev` after the user explicitly requested it and granted the
-  required `.git` write access.
-- Committed each of the 50 changed assignment files in its own commit with a
-  path-specific message. This keeps every commit limited to one file/change for review.
-- No remote push, PR, merge, or publication was performed. The commits exist only in the
-  connected local repository.
+- [x] Build K8s scaffold for API/UI/Chroma/Redis and separate Job/CronJob indexing; dev/prod overlays render.
+- [x] Provide container definitions, non-root execution, probes, resource requests/limits, security contexts, ingress, autoscaling and network policies.
+- [x] Implement extraction/OCR fallback, cleaning, chunking, embedding pin metadata and versioned vector-store publication.
+- [x] Implement grounded API retrieval, source/version filters, citation checks, retry/fallback, abstention, cache and readiness guard.
+- [x] Provide corpus manifest and document required source properties; record scan/table/absent-topic evidence.
+- [x] Add test suites, prompt-injection probe, 17-question real-corpus golden set and evaluation scoring/gate code.
+- [x] Write four ADRs, architecture/AI disclosure, pipeline, corpus, failure-analysis plans, engineering notes and local work log.
+- [x] Prepare CI and manual SHA-based CD workflows locally.
+- [ ] Establish and commit a measured baseline/results after real corpus indexing and model evaluation; run chunk-size and cache-threshold experiments.
+- [ ] Execute OCR and manually review scan output, especially the 2023 rules and 2022 policy.
+- [ ] Build images and run dev cluster; capture API/UI endpoints, probes, readiness mismatch, rollout/undo, HPA and NetworkPolicy evidence.
+- [ ] Run four deliberate failure experiments and replace planned procedures with timestamped actual diagnostics/remedies.
+- [ ] Configure GitHub environment protection/secrets, run CI/CD, and capture branch protection plus blocked-merge evidence.
+- [ ] Re-run full submission checker and resolve remaining evidence-dependent issues before submission.
 
-## Remaining requirements checklist
+## Next actions
 
-The checklist below will be expanded and updated as each requirement is implemented and
-verified. “Done” requires evidence; source code alone is not runtime evidence.
-
-- [ ] Corpus properties and provenance (`docs/CORPUS.md`, manifest, fetch script, hashes).
-- [x] Implement extraction, OCR fallback, cleaning, structure-aware chunking, embedding
-  pin plumbing, and versioned Chroma storage; [ ] verify with actual corpus and tests.
-- [ ] Three measured chunk configurations and recall@5 comparison.
-- [x] Implement API top-k retrieval with current-version filtering and embedding pin
-  readiness guard; [ ] verify with live Chroma and mismatch demonstration.
-- [x] Implement schema-constrained generation, citation validation, retry/fallback,
-  abstention; [ ] add tests and verify with a real/stubbed provider.
-- [x] Implement Redis semantic cache, safe exclusions, and re-index invalidation; [ ] tune
-  threshold from data, add tests, and complete cache ADR.
-- [x] Kubernetes manifests scaffold namespace, deployments, StatefulSet Chroma, persistent
-  Redis, index Job/CronJob, four ClusterIP services, ingress, HPA, network policies,
-  security contexts and resource requests/limits.
-- [x] Container image definitions and dev/prod Kustomize overlays; both overlays render.
-- [ ] Build images and verify all workload probes, readiness, storage, endpoint count,
-  rollout/undo, policy behavior, HPA metrics, and measured resource values on a cluster.
-- [ ] Structured logs and required Prometheus metrics.
-- [ ] At least 15 golden questions, recall@3/5, citation validity, abstention check and baseline.
-- [ ] Four deliberate failure analyses with diagnostics and remedies.
-- [ ] CI lint/test/coverage/manifests/build/scan/e2e gate and gated CD by SHA.
-- [ ] Required engineering notes, ADRs, README, AI disclosure, screenshots/evidence.
-- [ ] Run checker and available automated tests; document external/runtime blockers precisely.
+1. Run `docker info`, start Docker Desktop, and provision Minikube with Calico; otherwise use a cluster with equivalent ingress/metrics support.
+2. Fetch/verify the corpus and load `corpus/raw` into `corpus-data` using the temporary loader workflow. Run the real indexer and verify Chroma active revision/model metadata.
+3. Install/run Tesseract and Poppler through the indexer image, review OCR pages, and correct source metadata/golden sections if needed.
+4. Execute golden evaluation and chunk/cache sweeps; write only actual results to `eval/baseline.json` and `eval/results.json`.
+5. Capture evidence files from the actual cluster and GitHub settings; configure the protected production environment and required repository variables/secrets.
+6. Run `make check`, full tests, lint and type checks. Review the local commit list; do not push unless the user later authorizes it.
