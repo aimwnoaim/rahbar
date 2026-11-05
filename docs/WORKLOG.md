@@ -99,6 +99,15 @@ record, not private internal reasoning.
   inspect all nine documents for pages/OCR/tables/version pair, then finish corpus and
   evaluation artifacts. Keep actual cluster and CI evidence explicitly pending.
 
+### 2026-11-05 — local commit organization
+
+- Created local branch `dev` after the user explicitly requested it and granted the
+  required `.git` write access.
+- Committed each of the 50 changed assignment files in its own commit with a
+  path-specific message. This keeps every commit limited to one file/change for review.
+- No remote push, PR, merge, or publication was performed. The commits exist only in the
+  connected local repository.
+
 ## Remaining requirements checklist
 
 The checklist below will be expanded and updated as each requirement is implemented and
