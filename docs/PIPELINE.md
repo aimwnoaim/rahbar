@@ -1,25 +1,39 @@
 # Indexing and retrieval pipeline
 
-<!-- STARTER-TODO(3.1, 3.3, 5.2): fill each section with your numbers, then delete this comment. -->
+The indexer is a one-shot Kubernetes Job, separate from API startup. Its stages are `extract → clean → chunk → embed → publish`; implementations live in `indexer/pipeline/`. The default run reads `corpus/raw/`, embeds with the configured Ollama model, writes a versioned Chroma collection, then switches the registry's active collection. The API checks the expected embedding model before serving ready traffic.
 
-## Extraction
-Which documents needed OCR, one before-and-after example of a table, what could not be recovered.
+## Extraction and cleaning
 
-## Cleaning
-The rules you applied, and one thing you deliberately did not strip.
+PDF pages are extracted with pdfplumber. When normalized text has fewer than 25 characters, the page is rasterized with Poppler and OCR'd with Tesseract. PDF tables are serialized as pipe-delimited rows; HTML tables use the same row representation. Markdown front matter is skipped. Unsupported file extensions fail explicitly.
+
+Cleaning normalizes whitespace and drops repeated page-edge lines when they recur across pages. It retains section labels, page boundaries, numbers, punctuation, table row boundaries and clause identifiers because they support exact-term answers and citation locations. OCR text is tagged in the page model. OCR is not automatically trusted: the scanned 2023 policy and the eight-page 2022 policy still need visual quality review.
 
 ## Chunking
-Size and overlap you shipped, storage amplification (stored tokens / original tokens),
-and the three configurations you measured:
 
-| Size (tokens) | Overlap (tokens) | recall@5 | Chunks stored |
-| --- | --- | --- | --- |
+`indexer/pipeline/chunk.py` uses whitespace-delimited words as a practical token approximation (not a model tokenizer). It detects numbered/Markdown headings, groups paragraphs, prefers sentence boundaries, caps long sentences with sliding windows, and carries overlap across adjacent chunks. Every chunk records source, section, page, document version and superseded status. The configuration is currently 400 words with 50 words of overlap; these are provisional defaults, not empirically selected parameters.
 
-## Embedding
-Model, vector dimension, where the pin lives, how the API checks it.
+| Approx. size (words) | Overlap (words) | Recall@5 | Chunks stored | Status |
+| ---: | ---: | ---: | ---: | --- |
+| 250 | 30 | Not measured | Not measured | Experiment required |
+| 400 | 50 | Not measured | Not measured | Current implementation default |
+| 600 | 75 | Not measured | Not measured | Experiment required |
+
+The three configurations are specified to make the required experiment reproducible, but recall and chunk-count results are intentionally not invented. Run the same golden set against each configuration and record each result before claiming a winner. Storage amplification is likewise not yet measured: report `sum(chunk word counts) / sum(clean source word counts)` after extracting the full corpus. Overlap necessarily duplicates some text, while boundary-aware splitting may make the ratio differ from the simple `size / (size - overlap)` estimate.
+
+## Embedding and version pin
+
+`EMBED_MODEL` defaults to `nomic-embed-text`; the indexer and API both use the Ollama `/api/embed` endpoint. The configured model name is stored in Chroma collection metadata and exposed through the active registry. The API readiness route compares that metadata with its configured model and reports not-ready on a mismatch. The vector dimension is determined by the selected model and is checked by Chroma on writes; it has not been recorded from a live model in this environment.
+
+Current-document retrieval applies `superseded=false`. A narrow historical-language heuristic permits old policy chunks when a question explicitly refers to prior versions. This reduces accidental mixing but should be tested with a live index and explicit version questions. Re-indexing publishes a new versioned collection before switching the registry pointer, then flushes Redis. Cache keys include the active index revision, which also prevents old-revision hits if Redis flushing fails.
 
 ## Semantic cache
-Thresholds you tried, the false hit that ruled one out, the one you shipped.
+
+Redis entries store the query embedding, validated answer and cited passages, scoped by embedding model and index revision, with a seven-day TTL. The configured similarity cutoff currently defaults to 0.96. Abstentions, follow-up questions and non-Chroma/stub requests bypass cache use; only grounded answers are stored. Cache lookup scans the revision's keys and computes cosine similarity in the API, so this is suitable for a small assignment corpus, not a high-volume cache.
+
+No threshold sweep or measured false-hit example has been produced yet. Therefore 0.96 is a provisional safety setting, not a claimed optimum. Evaluate candidate thresholds against paraphrases and near-neighbor questions, record false hits and misses, then update this section and the cache ADR. Tests cover cache behavior without a live Redis service; operational invalidation and latency still need cluster evidence.
 
 ## Evaluation method
-How recall@k matches retrieved passages to golden ones (by source and section? by chunk id?).
+
+`eval/run_eval.py` compares each golden `(source, section)` pair with retrieved passages, accepting an exact normalized section or a retrieved subsection whose label begins with the expected label. It reports macro recall@3 and recall@5 for answerable questions, plus recall@5 by question type, citation validity (citation tuple must occur in retrieved passages), and must-abstain correctness. The gate permits at most a five percentage-point recall@5 regression from baseline, requires 95% citation validity, and requires every must-abstain question to be declined.
+
+Evaluation against the real corpus is blocked until a supported local cluster/model is available and the OCR-bearing documents have been reviewed. The fixture set can exercise the API and gate shape offline, but it is not a substitute for a measured real-corpus baseline. Never label a placeholder or fixture result as the production baseline.
