@@ -28,7 +28,7 @@ jobs:
           (cd indexer && mypy pipeline)
       - name: Unit and evaluation gate tests
         run: |
-          (cd api && pytest --cov=app --cov-report=term-missing --cov-report=xml:../coverage-api.xml -q)
+          (cd api && pytest --cov=app --cov-fail-under=60 --cov-report=term-missing --cov-report=xml:../coverage-api.xml -q)
           (cd indexer && pytest --cov=pipeline --cov-report=term-missing --cov-report=xml:../coverage-indexer.xml -q)
           (cd eval && pytest -q)
           python eval/run_eval.py --help
