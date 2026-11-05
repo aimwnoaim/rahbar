@@ -4,7 +4,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 
 ## Working rules
 
-- Work only in the connected local repository; do not push, publish, merge or open a PR.
+- Work only in the connected repository. Push only when the user explicitly authorizes it; do not merge or open a PR unless asked.
 - Keep all assignment changes on the user-requested local `dev-aimwnoaim` branch; keep each commit limited to one file/change.
 - The configured local Git author for new commits is `momnakhan24 <i243119@isb.nu.edu.pk>`. Earlier commits remain under their original authors; they were not rewritten. This sets commit attribution fields only and does not log into, impersonate, or grant access to a GitHub account. GitHub attribution depends on its account/email verification.
 - Record unknowns as unknown. Source code and rendered YAML are not evidence of a live rollout, measured retrieval quality or protected-branch behavior.
@@ -14,7 +14,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 
 | Requirement area | Status | What is verified / still needed |
 | --- | --- | --- |
-| Local branch and commit organization | Implemented locally | Branch `dev-aimwnoaim`; new commits use the requested local author metadata and one-file commits. No push occurred. |
+| Local branch and commit organization | Implemented and pushed | Branch `dev-aimwnoaim`; commits are one file/change each. The user authorized pushing the five local commits on 2026-11-05; local HEAD now matches origin. |
 | Kubernetes stub deployment | Manifests and smoke workflow prepared | Both Kustomize overlays render. Docker Desktop engine is unavailable here; no image build, cluster rollout, probes, endpoints, HPA behavior or rollback was observed locally. CI workflow has not run on GitHub. |
 | Corpus and provenance | Audited | Nine listed documents and SHA-256 manifest; seven PDFs total 279 pages, plus two HTML pages. Detailed audit is in [`CORPUS.md`](CORPUS.md). Raw files are ignored and not committed. |
 | Extraction, cleaning, chunking, embedding and store | Implemented; unit-tested in parts | PDF/HTML/Markdown/text parsing, OCR path, cleanup, structure-aware chunks, Ollama embeddings and staged versioned Chroma publish are implemented. 9 indexer tests pass. Full corpus indexing, OCR quality review and live vector-dimension evidence remain. |
@@ -29,6 +29,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 | Date (PKT) | Decision / assumption | Reason and limits |
 | --- | --- | --- |
 | 2026-11-05 | Use the connected repository at `C:\Users\HP\Downloads\rahbar-starter\rahbar-starter`; do not push. | The user connected this folder and explicitly requested local-only work. |
+| 2026-11-05 | Push the five committed changes on `dev-aimwnoaim` to origin. | The user explicitly authorized the push on 2026-11-05 after the local commits were reviewed. Push succeeded; no merge or PR was created. |
 | 2026-11-05 | Continue on branch `dev-aimwnoaim` and make one file/change per commit. | Explicit user instruction. Each new commit is independently reviewable. |
 | 2026-11-05 | Use the user-provided alternate account name/email only as local Git author metadata for new commits. | The user identified it as their own repo-owner account. Existing commits are not rewritten; no credentials or authenticated GitHub access were provided. |
 | 2026-11-05 | Use FAST-NUCES public documents from the starter source list. | Fits the assignment source and enables plausible exact-term and abstention questions. Web pages can change; manifest hashes establish the retrieved bytes. |
@@ -72,6 +73,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 - Investigated the uploaded Trivy CI log. The failing gate was scanning `rahbar-api:dev`: Debian packages had HIGH/CRITICAL findings and the installed Starlette 0.46.2 had three HIGH findings. It was a vulnerability scan failure, not a Docker socket failure.
 - Updated API and indexer Dockerfiles to Python 3.12.16 slim Trixie and refresh OS packages at build time; upgraded FastAPI and pinned Starlette to 1.7.0; configured the three Trivy image scans to fail on HIGH/CRITICAL vulnerabilities that have fixes while omitting unfixable findings. These changes are local commits `82e712c`, `22a58aa`, `931c004`, and `c703d7f`, each limited to one file.
 - After dependency update, API tests passed (14), API mypy passed (23 source files), and Ruff passed for `api indexer eval corpus`. The dependency installation resolved successfully. GitHub Actions has not yet run against these commits, so the scan result is not verified as fixed remotely; the UI image scan may reveal separate findings when CI progresses.
+- Pushed the five remediation/documentation commits to `origin/dev-aimwnoaim` after explicit user authorization. GitHub's combined status endpoint currently returned no check entries, so CI completion remains unverified.
 
 ## Assignment completion checklist
 
