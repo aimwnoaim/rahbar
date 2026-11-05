@@ -66,6 +66,9 @@ class FakeRedis:
     def set(self, key: str, value: str, ex: int) -> None:
         self.data[key] = value
 
+    def delete(self, key: str) -> int:
+        return int(self.data.pop(key, None) is not None)
+
 
 def test_below_relevance_floor_abstains_without_generation() -> None:
     provider = GoodProvider()
@@ -131,6 +134,7 @@ def test_cache_is_scoped_to_index_revision() -> None:
     cache.store([1.0, 0.0], "rev-1", answer, [PASSAGE])
     assert cache.lookup([1.0, 0.0], "rev-1") is not None
     assert cache.lookup([1.0, 0.0], "rev-2") is None
+    assert client.data == {}
 
 
 def test_follow_up_detector_skips_pronominal_follow_ups() -> None:
