@@ -25,7 +25,9 @@ def test_citation_validity_rejects_fabricated_citation() -> None:
 def test_summary_and_gate_enforce_abstention_and_citation_rate() -> None:
     rows = [{
         "id": "q1", "type": "ordinary", "relevant": [{"source": "r.pdf", "section": "1"}],
+        "expect": "supported term",
         "response": {
+            "answer": "The supported term appears here.",
             "retrieved": [{"source": "r.pdf", "section": "1 Topic", "page": 2}],
             "citations": [{"source": "r.pdf", "section": "1 Topic", "page": 2}],
             "answered_from_context": True,
@@ -36,6 +38,7 @@ def test_summary_and_gate_enforce_abstention_and_citation_rate() -> None:
     }]
     result = summarise(rows)
     assert result["recall_at_5"] == 1.0
+    assert result["expected_term_accuracy"] == 1.0
     assert result["abstention_correctness"] == 1.0
     assert not gate(result, {"recall_at_5": 1.0})
 
