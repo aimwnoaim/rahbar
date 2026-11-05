@@ -38,6 +38,11 @@ def _fallback() -> Answer:
     )
 
 
+def never_cache(answer: Answer, follow_up: bool) -> bool:
+    """Abstentions and context-dependent follow-ups must not enter semantic cache."""
+    return follow_up or not answer.answered_from_context
+
+
 def _validate_citations(answer: Answer, passages: list[Passage]) -> Answer:
     if not answer.answered_from_context:
         return answer.model_copy(update={"citations": []})
@@ -119,7 +124,7 @@ def answer_question(
         else:
             # A malformed response or citation is retried once. The user receives a safe
             # abstention after the second failure rather than a 500 or unsupported claim.
-            for attempt in range(2):
+            for validation_retry in range(2):
                 started = time.perf_counter()
                 try:
                     candidate = provider.generate(question, evidence)
@@ -127,7 +132,7 @@ def answer_question(
                     break
                 except Exception as exc:
                     log.warning("generation validation failed", extra={
-                        "attempt": attempt + 1, "error": type(exc).__name__,
+                        "attempt": validation_retry + 1, "error": type(exc).__name__,
                     })
                     answer = None
                 finally:
@@ -144,7 +149,7 @@ def answer_question(
     TOKENS_IN.inc(math.ceil((len(question) + sum(len(p.text) for p in passages)) / 4))
     TOKENS_OUT.inc(math.ceil(len(answer.answer) / 4))
 
-    if cache is not None and not cache_hit and not follow_up and answer.answered_from_context:
+    if cache is not None and not cache_hit and not never_cache(answer, follow_up):
         try:
             if query_embedding is not None:
                 cache.store(query_embedding, cache_revision, answer, passages)
