@@ -126,14 +126,17 @@ outstanding; see [WORKLOG](docs/WORKLOG.md).
 ## GitHub Actions setup
 
 CI runs on pushes and pull requests. In repository settings, protect `main` and require the
-`quality` and `cluster-smoke` CI checks before merge. To enable CD, create a protected
-GitHub Environment named `production` with required reviewers, add the base64 kubeconfig as
-the `KUBECONFIG_B64` environment secret, and define `API_IMAGE_REPOSITORY`,
-`INDEXER_IMAGE_REPOSITORY`, and `UI_IMAGE_REPOSITORY` as environment variables. The
-manually triggered CD workflow requires a 40-character image tag and explicit confirmation;
-the matching images must already exist in that registry. This repository workflow does not
-publish images. Do not store credentials or kubeconfigs in the repository. None of these
-GitHub settings are claimed as configured until captured in the evidence bundle.
+`quality` and `cluster-smoke` CI checks before merge. CD runs on a push to `main` or manual
+dispatch: tests must pass before images are built, scanned and published, and publication
+must succeed before deployment. Set the repository secret `DOCKERHUB_TOKEN` to a Docker Hub
+access token with push permission, and the variable `DOCKERHUB_USERNAME` to `aimwnoaim`
+(the workflow default). Images are published as `aimwnoaim/rahbar-{api,indexer,ui}:<commit SHA>`.
+The deployment job uses a disposable kind acceptance cluster and the protected `production`
+GitHub Environment, then verifies the published images through Ingress. That acceptance
+deployment uses the dev stub index; the real corpus and model deployment is validated
+separately on local Minikube. No external kubeconfig secret is needed for this ephemeral
+CD cluster. Do not store credentials in the repository. Settings and successful publication
+remain unverified until recorded in the evidence bundle.
 
 ## Security and attribution
 
