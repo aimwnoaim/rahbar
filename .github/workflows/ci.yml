@@ -78,6 +78,16 @@ jobs:
           kubectl rollout status deployment/ui -n rahbar --timeout=3m
           kubectl get endpoints -n rahbar
           kubectl get hpa -n rahbar
+      - name: Capture failed workload diagnostics
+        if: failure()
+        run: |
+          kubectl get pods,pvc -n rahbar -o wide || true
+          kubectl describe pods -n rahbar || true
+          for pod in $(kubectl get pods -n rahbar -o name); do
+            kubectl logs "$pod" -n rahbar --all-containers=true --tail=100 || true
+            kubectl logs "$pod" -n rahbar --all-containers=true --previous --tail=100 || true
+          done
+          kubectl get events -n rahbar --sort-by=.lastTimestamp || true
       - name: Smoke test question endpoint
         run: |
           kubectl port-forward service/api 8000:8000 -n rahbar >/tmp/rahbar-port-forward.log 2>&1 &
