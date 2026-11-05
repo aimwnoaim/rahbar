@@ -26,3 +26,6 @@ coverage-*.xml
 # Local scratch
 *.log
 .DS_Store
+
+# Local extraction and experiment caches
+work/
