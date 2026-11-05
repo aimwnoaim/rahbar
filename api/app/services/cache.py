@@ -45,7 +45,7 @@ class SemanticCache:
         for key in self.client.scan_iter(match=namespace + "*"):
             name = key.decode("utf-8") if isinstance(key, bytes) else key
             if not name.startswith(active_prefix):
-                removed += int(self.client.delete(key))
+                removed += cast(int, self.client.delete(key))
         return removed
 
     def lookup(self, vector: list[float], revision: str) -> tuple[Answer, list[Passage]] | None:
