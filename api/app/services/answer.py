@@ -124,7 +124,7 @@ def answer_question(
         else:
             # A malformed response or citation is retried once. The user receives a safe
             # abstention after the second failure rather than a 500 or unsupported claim.
-            for validation_retry in range(2):
+            for retry in range(2):
                 started = time.perf_counter()
                 try:
                     candidate = provider.generate(question, evidence)
@@ -132,7 +132,7 @@ def answer_question(
                     break
                 except Exception as exc:
                     log.warning("generation validation failed", extra={
-                        "attempt": validation_retry + 1, "error": type(exc).__name__,
+                        "attempt": retry + 1, "error": type(exc).__name__,
                     })
                     answer = None
                 finally:
