@@ -1,14 +1,16 @@
 # RAHBAR
 
+[![CI](https://github.com/momnakhan24/rahbar/actions/workflows/ci.yml/badge.svg)](https://github.com/momnakhan24/rahbar/actions/workflows/ci.yml)
+
 RAHBAR is a grounded question-answering service for FAST-NUCES public academic and
 student documents. It retrieves passages from an index built by a one-shot Kubernetes
 Job, then returns an answer with citations or declines when its evidence is insufficient.
 The API only reads Chroma; re-indexing is performed by a Job or the weekly CronJob.
 
-> This repository is being completed in stages. The current Kubernetes overlay uses the
-> starter retriever and provider so the cluster plumbing can be demonstrated before the
-> real corpus and generation pipeline are enabled. See [WORKLOG](docs/WORKLOG.md) for
-> verified status and outstanding requirements.
+> `dev` keeps the starter retriever/provider and a dummy index for plumbing checks.
+> `prod` selects Chroma retrieval, the Ollama host provider and the real corpus indexer.
+> Cluster rollout and measured retrieval evidence are still pending in this workspace;
+> see [WORKLOG](docs/WORKLOG.md) for the exact status.
 
 ## Architecture
 
@@ -72,11 +74,27 @@ make fetch
 python corpus/fetch.py --verify
 ```
 
-Configure the host Ollama service and model names, update `RETRIEVER`, `LLM_PROVIDER`, and
-`EMBED_MODEL` in `k8s/base/configmap.yaml`, then rebuild and load the indexer image with
-the corpus available to its Job. The exact corpus handoff and real indexer Job settings
-will be documented here after that path is implemented and exercised. Re-index after
-changing the embedding model; the API will be kept unready if index and query pins differ.
+The production overlay already selects Chroma retrieval, `ollama-host`, and
+`nomic-embed-text`. The base Job and CronJob run the real indexer; the dev overlay patches
+them to `--dummy`. Copying files into the PVC is an explicit step because Kubernetes
+cannot mount the ignored local corpus automatically. After applying the prod overlay and
+waiting for the `corpus-data` claim to bind, use the temporary loader pod:
+
+```bash
+kubectl apply -f k8s/base/corpus-loader.example.yaml
+kubectl wait --for=condition=Ready pod/corpus-loader -n rahbar --timeout=2m
+kubectl cp corpus/raw/. rahbar/corpus-loader:/corpus
+kubectl delete pod corpus-loader -n rahbar
+kubectl create job --from=cronjob/reindex first-index -n rahbar
+kubectl wait --for=condition=complete job/first-index -n rahbar --timeout=2h
+kubectl rollout status deployment/api -n rahbar --timeout=5m
+```
+
+The temporary loader manifest is deliberately excluded from Kustomize. It must be deleted
+after copying the corpus. Create the runtime secret only if hosted generation is selected;
+the prod overlay uses Ollama and does not require an API key. Set up `host.minikube.internal`
+and the `192.168.49.1/32` NetworkPolicy egress address for the actual cluster before use.
+Re-index after changing `EMBED_MODEL`; readiness compares the API pin with Chroma metadata.
 
 ## Endpoints
 
@@ -97,9 +115,13 @@ make dev
 make check
 ```
 
-Evaluation commands and the golden set will be added after the retrieval and evaluation
-functions are implemented. The UI screenshot, measured resource evidence, and cluster
-rollout / failure demonstrations are also outstanding; see [WORKLOG](docs/WORKLOG.md).
+The 17-question real corpus set is [`eval/golden.yaml`](eval/golden.yaml). Once the real
+index is available, run `make eval`; the runner writes `eval/results.json` and compares
+against `eval/baseline.json`. Do not update the baseline until the set has been reviewed
+and a deliberate evaluation run is complete. A tiny offline fixture set is available via
+`make eval-fixtures`, but the stub deployment cannot produce meaningful RAG scores. The UI
+screenshot, measured resource evidence, and cluster rollout/failure demonstrations remain
+outstanding; see [WORKLOG](docs/WORKLOG.md).
 
 ## Security and attribution
 
