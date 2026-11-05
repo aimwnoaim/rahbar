@@ -3,6 +3,13 @@ kind: Kustomization
 namespace: rahbar
 resources:
   - ../../base
+images:
+  - name: rahbar-api
+    newTag: 675ec46644f8ef2a4d0247322225f3bb6fb779cd
+  - name: rahbar-indexer
+    newTag: 675ec46644f8ef2a4d0247322225f3bb6fb779cd
+  - name: rahbar-ui
+    newTag: 675ec46644f8ef2a4d0247322225f3bb6fb779cd
 patches:
   - target:
       kind: ConfigMap
