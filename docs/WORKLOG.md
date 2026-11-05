@@ -106,3 +106,9 @@ This log is the reviewable record of implementation, verification, assumptions a
 4. Execute golden evaluation and chunk/cache sweeps; write only actual results to `eval/baseline.json` and `eval/results.json`.
 5. Capture evidence files from the actual cluster and GitHub settings; configure the protected production environment and required repository variables/secrets.
 6. Run `make check`, full tests, lint and type checks. Review the local commit list; do not push unless the user later authorizes it.
+
+### CI follow-up: indexer startup
+
+- Run 42081591091 passed quality and all image scans. Chroma and Redis became ready; the indexer Job did not complete within five minutes. Its logs were not captured by that workflow.
+- Added a bounded 60-second Chroma heartbeat wait before creating the indexer client (e1a81f8). This addresses an identified startup race; the failed Job's exact cause is not yet confirmed.
+- Added workload descriptions, current/previous container logs, and events on failure (8f92cd1). Indexer tests: 9 passed; Ruff passed. Next CI run will validate the wait and reveal any remaining failure.
