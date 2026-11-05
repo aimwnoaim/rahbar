@@ -64,7 +64,7 @@ class FakeRedis:
 
     def scan_iter(self, match: str):
         prefix = match.removesuffix("*")
-        return (key for key in self.data if key.startswith(prefix))
+        return iter([key for key in self.data if key.startswith(prefix)])
 
     def get(self, key: str) -> str | None:
         return self.data.get(key)
