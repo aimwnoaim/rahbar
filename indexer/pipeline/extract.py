@@ -17,21 +17,35 @@ class _HTMLText(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.parts: list[str] = []
+        self.row: list[str] | None = None
+        self.cell: list[str] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag in self.BLOCKS or tag == "tr":
+        if tag == "tr":
+            self.row = []
+        elif tag in {"td", "th"}:
+            self.cell = []
+        elif tag in self.BLOCKS and self.row is None:
             self.parts.append("\n")
-        if tag in {"td", "th"} and self.parts and self.parts[-1] != "\n":
-            self.parts.append(" | ")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in self.BLOCKS or tag == "tr":
+        if tag in {"td", "th"} and self.cell is not None:
+            if self.row is not None:
+                self.row.append(" ".join(self.cell))
+            self.cell = None
+        elif tag == "tr" and self.row is not None:
+            self.parts.extend([" | ".join(self.row), "\n"])
+            self.row = None
+        elif tag in self.BLOCKS and self.row is None:
             self.parts.append("\n")
 
     def handle_data(self, data: str) -> None:
         cleaned = " ".join(data.split())
         if cleaned:
-            self.parts.append(cleaned)
+            if self.cell is not None:
+                self.cell.append(cleaned)
+            else:
+                self.parts.append(cleaned)
 
 
 def _markdown(path: Path) -> str:
