@@ -5,7 +5,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 ## Working rules
 
 - Work only in the connected local repository; do not push, publish, merge or open a PR.
-- Keep all assignment changes on the user-requested local `dev` branch; keep each commit limited to one file/change.
+- Keep all assignment changes on the user-requested local `dev-aimwnoaim` branch; keep each commit limited to one file/change.
 - The configured local Git author for new commits is `momnakhan24 <i243119@isb.nu.edu.pk>`. Earlier commits remain under their original authors; they were not rewritten. This sets commit attribution fields only and does not log into, impersonate, or grant access to a GitHub account. GitHub attribution depends on its account/email verification.
 - Record unknowns as unknown. Source code and rendered YAML are not evidence of a live rollout, measured retrieval quality or protected-branch behavior.
 - Assignment deadline from the handout: 8 November 2026, 23:59 PKT.
@@ -14,7 +14,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 
 | Requirement area | Status | What is verified / still needed |
 | --- | --- | --- |
-| Local branch and commit organization | Implemented locally | Branch `dev`; new commits use the requested local author metadata and one-file commits. No push occurred. |
+| Local branch and commit organization | Implemented locally | Branch `dev-aimwnoaim`; new commits use the requested local author metadata and one-file commits. No push occurred. |
 | Kubernetes stub deployment | Manifests and smoke workflow prepared | Both Kustomize overlays render. Docker Desktop engine is unavailable here; no image build, cluster rollout, probes, endpoints, HPA behavior or rollback was observed locally. CI workflow has not run on GitHub. |
 | Corpus and provenance | Audited | Nine listed documents and SHA-256 manifest; seven PDFs total 279 pages, plus two HTML pages. Detailed audit is in [`CORPUS.md`](CORPUS.md). Raw files are ignored and not committed. |
 | Extraction, cleaning, chunking, embedding and store | Implemented; unit-tested in parts | PDF/HTML/Markdown/text parsing, OCR path, cleanup, structure-aware chunks, Ollama embeddings and staged versioned Chroma publish are implemented. 9 indexer tests pass. Full corpus indexing, OCR quality review and live vector-dimension evidence remain. |
@@ -29,7 +29,7 @@ This log is the reviewable record of implementation, verification, assumptions a
 | Date (PKT) | Decision / assumption | Reason and limits |
 | --- | --- | --- |
 | 2026-11-05 | Use the connected repository at `C:\Users\HP\Downloads\rahbar-starter\rahbar-starter`; do not push. | The user connected this folder and explicitly requested local-only work. |
-| 2026-11-05 | Continue on branch `dev` and make one file/change per commit. | Explicit user instruction. Each new commit is independently reviewable. |
+| 2026-11-05 | Continue on branch `dev-aimwnoaim` and make one file/change per commit. | Explicit user instruction. Each new commit is independently reviewable. |
 | 2026-11-05 | Use the user-provided alternate account name/email only as local Git author metadata for new commits. | The user identified it as their own repo-owner account. Existing commits are not rewritten; no credentials or authenticated GitHub access were provided. |
 | 2026-11-05 | Use FAST-NUCES public documents from the starter source list. | Fits the assignment source and enables plausible exact-term and abstention questions. Web pages can change; manifest hashes establish the retrieved bytes. |
 | 2026-11-05 | Keep current rules as default and permit superseded chunks only when a question asks historically. | Prevent accidental citation of old policy. Historical retrieval still needs a live, reviewed version-pair evaluation. |
@@ -69,6 +69,9 @@ This log is the reviewable record of implementation, verification, assumptions a
 - The most recent full test runs passed: API 14, indexer 9 and evaluation 4. Ruff passed; API mypy reported no issues in 23 files; indexer mypy reported no issues in 10 files. Both Kustomize overlays rendered successfully.
 - README now lists the GitHub Environment, secrets, variables, required checks and registry image prerequisites for the manual CD workflow. Those external settings have not been configured from this local-only workspace.
 - Added [`OPERATIONS.md`](OPERATIONS.md) with safe cluster, rollback, failure-injection, GitHub protection and evidence-capture steps; it is a runbook, not evidence of those operations.
+- Investigated the uploaded Trivy CI log. The failing gate was scanning `rahbar-api:dev`: Debian packages had HIGH/CRITICAL findings and the installed Starlette 0.46.2 had three HIGH findings. It was a vulnerability scan failure, not a Docker socket failure.
+- Updated API and indexer Dockerfiles to Python 3.12.16 slim Trixie and refresh OS packages at build time; upgraded FastAPI and pinned Starlette to 1.7.0; configured the three Trivy image scans to fail on HIGH/CRITICAL vulnerabilities that have fixes while omitting unfixable findings. These changes are local commits `82e712c`, `22a58aa`, `931c004`, and `c703d7f`, each limited to one file.
+- After dependency update, API tests passed (14), API mypy passed (23 source files), and Ruff passed for `api indexer eval corpus`. The dependency installation resolved successfully. GitHub Actions has not yet run against these commits, so the scan result is not verified as fixed remotely; the UI image scan may reveal separate findings when CI progresses.
 
 ## Assignment completion checklist
 
@@ -79,7 +82,8 @@ This log is the reviewable record of implementation, verification, assumptions a
 - [x] Provide corpus manifest and document required source properties; record scan/table/absent-topic evidence.
 - [x] Add test suites, prompt-injection probe, 17-question real-corpus golden set and evaluation scoring/gate code.
 - [x] Write four ADRs, architecture/AI disclosure, pipeline, corpus, failure-analysis plans, engineering notes and local work log.
-- [x] Prepare CI and manual SHA-based CD workflows locally.
+- [x] Prepare CI and manual SHA-based CD workflows locally; address the uploaded API Trivy failure in four one-file local commits.
+- [ ] Run GitHub CI against the local remediation commits and review any subsequent indexer/UI scan failures.
 - [ ] Establish and commit a measured baseline/results after real corpus indexing and model evaluation; run chunk-size and cache-threshold experiments.
 - [ ] Execute OCR and manually review scan output, especially the 2023 rules and 2022 policy.
 - [ ] Build images and run dev cluster; capture API/UI endpoints, probes, readiness mismatch, rollout/undo, HPA and NetworkPolicy evidence.
