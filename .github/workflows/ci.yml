@@ -31,6 +31,7 @@ jobs:
           (cd api && pytest -q)
           (cd indexer && pytest -q)
           (cd eval && pytest -q)
+          python eval/run_eval.py --help
       - name: Validate rendered Kubernetes manifests
         run: |
           for overlay in dev prod; do
