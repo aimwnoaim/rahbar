@@ -6,6 +6,8 @@ import os
 import time
 import uuid
 from typing import Any
+from urllib.error import URLError
+from urllib.request import urlopen
 
 import redis
 
@@ -16,6 +18,19 @@ from .models import Chunk
 def get_client(settings: IndexerSettings) -> Any:
     import chromadb  # the thin client, from chromadb-client in requirements.txt
     from chromadb.config import Settings as ChromaSettings
+
+    # Jobs can start before the Chroma server is accepting requests.
+    heartbeat = f"http://{settings.chroma_host}:{settings.chroma_port}/api/v2/heartbeat"
+    deadline = time.monotonic() + 60
+    while True:
+        try:
+            with urlopen(heartbeat, timeout=2) as response:
+                response.read()
+            break
+        except (URLError, TimeoutError):
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(2)
 
     return chromadb.HttpClient(host=settings.chroma_host, port=settings.chroma_port,
                                settings=ChromaSettings(anonymized_telemetry=False))
