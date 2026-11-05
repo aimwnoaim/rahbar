@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from app.config import get_settings
+from app.routes.health import embedding_model_mismatch
 from app.schemas import Answer, Citation, Passage
 from app.services.answer import answer_question
 from app.services.cache import SemanticCache, is_follow_up
@@ -14,6 +15,11 @@ PASSAGE = Passage(
     chunk_id="c1", text="Clause 5.4 sets a 2.00 minimum CGPA.", source="rules.pdf",
     section="5.4 Academic Warning", page=12, score=0.9,
 )
+
+
+def test_readiness_rejects_a_different_index_embedding_model() -> None:
+    assert embedding_model_mismatch("nomic-embed-text", "other-model")
+    assert not embedding_model_mismatch("nomic-embed-text", "nomic-embed-text")
 
 
 class OneRetriever:
