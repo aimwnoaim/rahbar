@@ -28,7 +28,7 @@ spec:
         - name: chroma
           image: chromadb/chroma:1.0.12
           imagePullPolicy: IfNotPresent
-          args: ["run", "--path", "/data"]
+          args: ["run", "--path", "/data", "--host", "0.0.0.0"]
           ports:
             - name: http
               containerPort: 8000
