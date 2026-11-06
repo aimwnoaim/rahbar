@@ -83,3 +83,27 @@ def test_markdown_clause_text_keeps_its_parent_section() -> None:
     assert all(c.section == "2. Academic warning" for c in chunks)
     assert "CGPA below 2.00" in " ".join(c.text for c in chunks)
     assert "withdrawal" in " ".join(c.text for c in chunks)
+
+
+def test_pdf_extraction_ignores_text_outside_the_visible_page(tmp_path) -> None:
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=300, height=200)
+    font = DictionaryObject({NameObject("/Type"): NameObject("/Font"),
+                             NameObject("/Subtype"): NameObject("/Type1"),
+                             NameObject("/BaseFont"): NameObject("/Helvetica")})
+    page[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})})
+    content = DecodedStreamObject()
+    content.set_data(
+        b"BT /F1 12 Tf 20 100 Td (Visible current policy requires attendance.) Tj ET\n"
+        b"BT /F1 12 Tf -400 100 Td (Hidden obsolete policy) Tj ET"
+    )
+    page[NameObject("/Contents")] = content
+    path = tmp_path / "off-page.pdf"
+    writer.write(path)
+    doc = extract(str(path), "2026", False)
+    assert "Visible current policy" in doc.pages[0].text
+    assert "Hidden obsolete" not in doc.pages[0].text
