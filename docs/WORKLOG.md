@@ -156,3 +156,5 @@ This log is the reviewable record of implementation, verification, assumptions a
 - Corrected bulk embedding is in progress. A live sample showed indexer 1m CPU / 586Mi while the external Ollama service used about six CPU cores; this demonstrates why API/indexer CPU alone does not represent external model compute. No final recall or real-corpus baseline is claimed before evaluation completes.
 
 - Local Chroma terminated with OOMKilled (exit 137) at 10:15:21 UTC while limited to 1Gi. Increased its request from 384Mi to 768Mi and limit to 2Gi before index publication. This is a measured runtime correction; post-change stability remains under observation.
+
+- CI run 42177121689 passed quality, manifests, image builds/scans and stub cluster smoke, then failed because fixture Ollama was not accepting connections yet. Added a bounded 60-second readiness loop before model pull; final ollama list still fails explicitly if startup never succeeds. Rerun pending.
