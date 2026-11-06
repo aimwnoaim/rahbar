@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
-
-import redis
 
 from .config import IndexerSettings
 from .models import Chunk
@@ -83,13 +80,6 @@ def store(chunks: list[Chunk], vectors: list[list[float]], settings: IndexerSett
         "index_revision": revision,
     })
 
-    cache = redis.Redis.from_url(
-        os.environ.get("REDIS_URL", "redis://redis:6379/0"),
-        socket_connect_timeout=5,
-        socket_timeout=5,
-    )
-    try:
-        cache.flushdb()
-    finally:
-        cache.close()
+    # Publishing a new revision invalidates old cache keys immediately. The API
+    # prunes obsolete revisions on its next lookup; only it may connect to Redis.
     return len(chunks)
