@@ -45,7 +45,10 @@ def never_cache(answer: Answer, follow_up: bool) -> bool:
 
 def _validate_citations(answer: Answer, passages: list[Passage]) -> Answer:
     if not answer.answered_from_context:
-        return answer.model_copy(update={"citations": []})
+        return answer.model_copy(update={
+            "answer": "The available documents do not establish an answer to this question.",
+            "citations": [], "confidence": "low",
+        })
     valid = {(p.source, p.section, p.page) for p in passages}
     if not answer.citations:
         raise ValueError("grounded answer has no citations")
