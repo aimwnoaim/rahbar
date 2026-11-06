@@ -11,6 +11,7 @@ _HEADING = re.compile(
     r"^\s*(?:#{1,6}\s+|\d+(?:\.\d+)*\s+|[A-Z][A-Z\s:&()/-]{5,}$)"
 )
 _SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9(])")
+_NUMBERED = re.compile(r"^\d+(?:\.\d+)*\.?(?:\s+|$)")
 
 
 def _count(text: str) -> int:
@@ -52,17 +53,27 @@ def chunk(doc: Document, size: int, overlap: int) -> list[Chunk]:
 
     for page in doc.pages:
         section = "Document"
+        markdown_section = False
         groups: list[tuple[str, list[str]]] = []
         for paragraph in re.split(r"\n\s*\n", page.text):
             lines = [line.strip() for line in paragraph.splitlines() if line.strip()]
             body: list[str] = []
             for line in lines:
-                if _HEADING.match(line):
+                numbered = bool(_NUMBERED.match(line))
+                markdown = line.startswith("#")
+                heading = markdown or (bool(_HEADING.match(line)) and not numbered)
+                clause = numbered and not markdown_section
+                if heading or clause:
                     if body:
                         text = " ".join(body)
                         groups.append((section, [part.strip() for part in _SENTENCE.split(text) if part.strip()]))
                         body = []
                     section = line.lstrip("# ").strip()
+                    markdown_section = markdown
+                    # A PDF clause contains both its identifier and policy text.
+                    # Keep that text in evidence instead of discarding the line.
+                    if clause:
+                        body.append(line)
                 else:
                     body.append(line)
             if body:
