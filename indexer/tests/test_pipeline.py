@@ -101,7 +101,7 @@ def test_pdf_extraction_ignores_text_outside_the_visible_page(tmp_path) -> None:
         b"BT /F1 12 Tf 20 100 Td (Visible current policy requires attendance.) Tj ET\n"
         b"BT /F1 12 Tf -400 100 Td (Hidden obsolete policy) Tj ET"
     )
-    page[NameObject("/Contents")] = content
+    page[NameObject("/Contents")] = writer._add_object(content)
     path = tmp_path / "off-page.pdf"
     writer.write(path)
     doc = extract(str(path), "2026", False)
