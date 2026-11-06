@@ -53,14 +53,14 @@ questions:
     expect: "2 to 4"
   - id: r11
     type: version
-    question: In the June 2026 rules, what minimum CGPA avoids academic warning?
-    relevant: [{source: academic-rules-handbook-jun-2026.pdf, section: "5.4"}]
-    expect: "2.00"
+    question: Under the current June 2026 rules, how long is the summer semester?
+    relevant: [{source: academic-rules-handbook-jun-2026.pdf, section: "6.1"}]
+    expect: "8-week"
   - id: r12
     type: version
-    question: According to the current 2026 rules, what attendance percentage is specified in clause 1.21?
-    relevant: [{source: academic-rules-handbook-jun-2026.pdf, section: "1.21"}]
-    expect: "100%"
+    question: Under the current 2026 summer rules, may a graduating student register for new elective courses?
+    relevant: [{source: academic-rules-handbook-jun-2026.pdf, section: "6.2"}]
+    expect: "No new courses"
   - id: r13
     type: exact
     question: What is the listed fee for the BBA / BS program on the fee page?
@@ -96,3 +96,4 @@ questions:
     question: Is financial assistance or a scholarship available for summer semester study?
     relevant: [{source: academic-rules-handbook-jun-2026.pdf, section: "6.10"}]
     expect: "not available"
+
