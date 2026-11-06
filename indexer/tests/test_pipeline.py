@@ -61,3 +61,25 @@ def test_chunk_rejects_invalid_overlap() -> None:
         assert "overlap" in str(exc)
     else:
         raise AssertionError("invalid overlap was accepted")
+
+
+def test_numbered_pdf_clauses_remain_searchable_evidence() -> None:
+    doc = Document("rules.pdf", "2026", False, [Page("rules.pdf", 1,
+        "5.4 A CGPA below 2.00 results in academic warning.\n"
+        "5.6 Three warnings result in withdrawal.")])
+    chunks = chunk(doc, size=400, overlap=50)
+    assert len(chunks) == 2
+    assert chunks[0].section.startswith("5.4")
+    assert "CGPA below 2.00" in chunks[0].text
+    assert chunks[1].section.startswith("5.6")
+    assert "withdrawal" in chunks[1].text
+
+
+def test_markdown_clause_text_keeps_its_parent_section() -> None:
+    doc = Document("rules.md", "2026", False, [Page("rules.md", 1,
+        "## 2. Academic warning\n\n2.1 A CGPA below 2.00 triggers warning.\n\n"
+        "2.2 Three warnings result in withdrawal.")])
+    chunks = chunk(doc, size=400, overlap=50)
+    assert all(c.section == "2. Academic warning" for c in chunks)
+    assert "CGPA below 2.00" in " ".join(c.text for c in chunks)
+    assert "withdrawal" in " ".join(c.text for c in chunks)
