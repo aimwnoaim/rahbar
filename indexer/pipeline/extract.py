@@ -65,10 +65,15 @@ def _pdf(path: Path) -> list[tuple[str, bool]]:
     pages: list[tuple[str, bool]] = []
     with pdfplumber.open(path) as pdf:
         for number, page in enumerate(pdf.pages, start=1):
+            # Some booklet PDFs retain text from adjacent pages outside MediaBox.
+            # Raster viewers hide it; extraction must respect the same bounds.
+            page = page.crop(page.bbox)
             text = page.extract_text(layout=False) or ""
             if len(re.sub(r"\s+", "", text)) < 25:
                 images = convert_from_path(str(path), first_page=number, last_page=number, dpi=250)
-                text = pytesseract.image_to_string(images[0]) if images else ""
+                # These scans have a single text block with a narrow clause-number
+                # column. Automatic layout can detach every number from its text.
+                text = pytesseract.image_to_string(images[0], config="--psm 6") if images else ""
                 pages.append((text, True))
             else:
                 tables = page.extract_tables() or []
