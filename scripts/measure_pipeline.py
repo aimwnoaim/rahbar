@@ -7,6 +7,8 @@ This measures retrieval only; run eval/run_eval.py separately for generation.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import inspect
 import json
 import sys
 from dataclasses import asdict
@@ -35,15 +37,20 @@ def main() -> None:
     evidence.mkdir(parents=True, exist_ok=True)
     documents = []
     extraction = []
+    extractor_hash = hashlib.sha256(Path(inspect.getfile(extract)).read_bytes()).hexdigest()
     for path, version, superseded in discover(str(root / "corpus" / "raw")):
         saved = cache / f"{path.name}.json"
-        if saved.exists():
-            data = json.loads(saved.read_text())
+        source_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+        data = json.loads(saved.read_text()) if saved.exists() else {}
+        if (data.get("source_sha256") == source_hash
+                and data.get("extractor_sha256") == extractor_hash):
             doc = Document(data["source"], data["doc_version"], data["superseded"],
                            [Page(**page) for page in data["pages"]])
         else:
             doc = extract(str(path), version, superseded)
-            saved.write_text(json.dumps(asdict(doc)), encoding="utf-8")
+            data = {**asdict(doc), "source_sha256": source_hash,
+                    "extractor_sha256": extractor_hash}
+            saved.write_text(json.dumps(data), encoding="utf-8")
         extraction.append({"source": doc.source, "pages": len(doc.pages),
                            "ocr_pages": [p.page for p in doc.pages if p.ocr],
                            "words": sum(len(p.text.split()) for p in doc.pages)})
