@@ -28,10 +28,10 @@ spec:
                 name: rahbar-config
           resources:
             requests:
-              cpu: 250m
+              cpu: 1
               memory: 512Mi
             limits:
-              cpu: 1
+              cpu: 2
               memory: 2Gi
           securityContext:
             allowPrivilegeEscalation: false
