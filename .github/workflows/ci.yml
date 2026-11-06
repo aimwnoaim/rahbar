@@ -102,6 +102,11 @@ jobs:
       - name: Start pinned fixture embedding service
         run: |
           docker run -d --name fixture-ollama --network kind ollama/ollama@sha256:ebaef4f4c5d93660e1f25f8ad085a112f51ccfb0e8458073e71793959dba91c9
+          for attempt in $(seq 1 30); do
+            if docker exec fixture-ollama ollama list >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          docker exec fixture-ollama ollama list
           docker exec fixture-ollama ollama pull nomic-embed-text
           address=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' fixture-ollama)
           echo "FIXTURE_OLLAMA_URL=http://$address:11434" >> "$GITHUB_ENV"
