@@ -1,0 +1,5 @@
+{
+  "status": "pending_measurement",
+  "recall_at_5": null,
+  "note": "No real-corpus baseline has been measured. This placeholder intentionally causes the evaluation gate to fail until the indexed corpus and selected model are evaluated. Replace this file only with output from eval/run_eval.py --update-baseline after reviewing the run."
+}
