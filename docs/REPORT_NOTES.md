@@ -34,19 +34,26 @@
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
 | Full Batch A | 10 | 8 | 1 | 1 | 724 | 0 | [Verification](../eval/results/verification_report_20261123T193246Z-8e991eba.json), [incremental](../eval/results/incremental_20261123T193246Z-8e991eba.json) |
 | Batch B against authored Batch A fixture | 11 | 5 | 1 | 5 | 6 | 1 | [Verification](../eval/results/verification_report_20261123T194050Z-9cf18ab7.json), [incremental](../eval/results/incremental_20261123T194050Z-9cf18ab7.json) |
+| Batch B against full Batch A | 11 | 5 | 1 | 5 | 6 | 1 | [Verification](../eval/results/verification_report_20261123T200954Z-f924f005.json), [incremental](../eval/results/incremental_20261123T200954Z-f924f005.json) |
 | Unchanged authored fixture | 1 | 0 | 0 | 0 | 0 | 0 | [Incremental](../eval/results/incremental_fixture_unchanged.json) |
 
 The full Batch A run flagged the 2023–24 annual report as a near duplicate of the 2019–20 report at cosine 0.951385. The report titles identify different periods. This is a likely false positive from shared structure and boilerplate. [Full Batch A verification](../eval/results/verification_report_20261123T193246Z-8e991eba.json)
 
-With the fixture inbox changed to remove the locker policy, reconciliation deleted its chunk and found no orphans. The restored recorder revision then replaced the active chunk. [Deletion](../eval/results/incremental_20261123T195520Z-6e4d692a.json), [restore](../eval/results/restore_fixture.json)
+With the fixture inbox changed to remove the locker policy, reconciliation deleted its chunk and found no orphans. After restore, a real retrieval returned the earlier recorder policy. [Deletion](../eval/results/incremental_20261123T195520Z-6e4d692a.json), [restore](../eval/results/restore_fixture.json), [restored retrieval](../eval/results/restore_fixture_retrieval.json)
 
 ## B and C. Evaluation and release
 
 The three-level evaluation, noise, seeded differences and candidate decision require completed baseline and candidate result files. The configured thresholds are in `config/gate.yaml`. Release status is pending.
 
+The 600-word candidate reused 633 vectors from byte-identical baseline chunks, kept 64 previously indexed vectors and embedded 18 remaining chunks. [Candidate reconciliation](../eval/results/candidate_sync.json)
+
 ## D. Observability
 
 The trace saves retrieved text, ranking, rail actions, filtered generation context and the complete Ollama request bodies.
+
+A full-corpus query about lecture credit hours reconstructed both model requests and passed prompt hash verification. The Kubernetes Service also returned the trace metrics through a local port-forward. [Full-corpus trace](../traces/full-corpus-first-answer.jsonl), [reconstructed prompt](../eval/results/reconstructed_prompt_first_answer.json), [Kubernetes metrics](../eval/results/k8s_metrics_endpoint.json)
+
+On the updated full corpus, a fresh query cited the five-working-day policy. The exact repeat returned the same source-backed response from the cache. [Batch B trace and cache hit](../traces/batch-b-version-and-cache.jsonl)
 
 1. Trace `749f8d0a2517460abd1b713da4956327` asks where the recorder return locker is.
 2. The top retrieval is the locker policy in the Batch B fixture.
@@ -64,13 +71,16 @@ At the calibrated cutoff of 0.540988, coverage was 65% before expansion and 100%
 
 The fresh `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. Fixture ingestion ran in the Kubernetes Job. Live and candidate Deployments reached readiness, the API rejected a write attempt, and the fixture chunk survived a Chroma pod restart. The Kubernetes workloads called the pinned local Ollama through a temporary relay while the in-cluster Ollama image pull was stalled. [Ingest Job](../eval/results/k8s_fixture_ingest.json), [API write rejection](../eval/results/k8s_api_readonly.txt), [persistence](../eval/results/k8s_chroma_persistence.txt)
 
-| Workload | Observed CPU | Observed memory | Resource request based on the fixture sample |
+| Workload | Highest sampled CPU | Highest sampled memory | Resource request |
 | --- | ---: | ---: | --- |
-| Live API | 286m | 77 MiB | 300m CPU, 128 MiB |
-| Candidate API | 274m | 77 MiB | 300m CPU, 128 MiB |
-| Chroma | 178m | 87 MiB | 200m CPU, 128 MiB |
+| Live API | 286m | 270 MiB | 300m CPU, 320 MiB |
+| Candidate API | 274m | 264 MiB | 300m CPU, 320 MiB |
+| Chroma | 178m | 466 MiB | 200m CPU, 512 MiB |
+| Eval Job | 0m | 25 MiB | 200m CPU, 192 MiB |
 
-This is a fixture-scale sample. Full ingestion and evaluation Job resource sizing and the production release decision still require workload measurements. [Minikube resource output](../eval/results/resources_minikube_fixture.txt)
+The CPU and memory samples came from different stages of the fixture run. The Eval Job sample was taken while waiting on its dependency. Its configured request allows headroom for active work. Full-corpus resource sizing still requires a sustained cluster run. [Service sample](../eval/results/resources_minikube_fixture.txt), [Eval Job sample](../eval/results/resources_minikube_eval_job.txt)
+
+The Kubernetes smoke baseline finished. The first candidate Job received an HTTP 502 during evaluation, so it exited before the gate. [Smoke baseline](../eval/results/k8s_smoke_baseline.json), [per-question output](../eval/results/k8s_smoke_baseline_details.jsonl), [initial Job failure](../eval/results/k8s_smoke_first_failure.txt)
 
 ## Short answers
 

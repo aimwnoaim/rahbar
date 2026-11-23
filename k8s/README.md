@@ -57,6 +57,8 @@ commit=$(git rev-parse HEAD)
 
 Change a gate limit with `"${k[@]}" edit configmap gate-config`. Delete the eval Job and rerun the preceding creation command. Collect both gate outcomes before changing the live Deployment. The measured release decision belongs in the report.
 
+To isolate a threshold change, run the same Job with `EVALUATED_CANDIDATE_PATH` set to the measured candidate JSON under `/data/results`. With that variable unset, the Job evaluates the candidate before applying the gate.
+
 ```bash
 "${k[@]}" annotate deploy/api kubernetes.io/change-cause='candidate passed offline gate' --overwrite
 "${k[@]}" set env deploy/api CHROMA_COLLECTION=rahbar_v2_nomic CHUNK_SIZE=600

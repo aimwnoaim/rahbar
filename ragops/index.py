@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
@@ -107,9 +108,10 @@ def synchronize(
     inactive = sorted(
         set(lake.manifest["versions"]) - set(lake.manifest["active"])
     )
+    counts_by_document = Counter(metadata["doc_id"] for metadata in final.values())
     return {
         "chunks_embedded": embedded, "chunks_deleted": len(deleted),
         "chunks_kept": len(expected) - embedded - reused, "chunks_reused": reused,
         "orphan_check": "pass",
-        "inactive_doc_chunk_counts": dict.fromkeys(inactive, 0),
+        "inactive_doc_chunk_counts": {doc_id: counts_by_document[doc_id] for doc_id in inactive},
     }

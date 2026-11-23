@@ -111,7 +111,7 @@ def module_metrics(path: Path) -> dict[str, Any]:
 
 def suite(
     client: httpx.Client, endpoint: str, questions: list[dict[str, Any]], collection: str,
-    *, noise: bool = False,
+    *, noise: bool = False, retrieval_only: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     details = []
     for question in questions:
@@ -120,7 +120,7 @@ def suite(
             text = re.sub(r"\b([A-Za-z])([A-Za-z])([A-Za-z]{4,})", r"\2\1\3", text, count=1)
         response = client.post(
             f"{endpoint.rstrip('/')}/query",
-            params={"bypass_cache": "true", "retrieval_only": str(noise).lower()},
+            params={"bypass_cache": "true", "retrieval_only": str(noise or retrieval_only).lower()},
             json={"question": text},
         )
         response.raise_for_status()
@@ -128,7 +128,7 @@ def suite(
         if trace["collection"] != collection:
             raise ValueError(f"evaluation requested {collection} but API used {trace['collection']}")
         scores = grade(question, trace)
-        if noise:
+        if noise or retrieval_only:
             scores = {key: value for key, value in scores.items() if key in rank_metrics(None)}
         details.append({"golden": question, "trace": trace, "scores": scores})
     keys = sorted({key for row in details for key in row["scores"]})
@@ -144,6 +144,7 @@ def suite(
 
 def evaluate(
     endpoint: str, collection: str, golden: Path, pairs: Path, out: Path, label: str, split: str,
+    *, retrieval_only: bool = False,
 ) -> Path:
     questions = [
         row for row in json_lines(golden) if row.get("split", "a") == "a" or split == "ab"
@@ -156,11 +157,12 @@ def evaluate(
     if not questions:
         raise ValueError("no golden questions selected")
     timestamp = datetime.now(timezone.utc)
-    base = out / f"eval_{timestamp.strftime('%Y%m%dT%H%M%S%fZ')}_{label}"
+    prefix = "retrieval_eval" if retrieval_only else "eval"
+    base = out / f"{prefix}_{timestamp.strftime('%Y%m%dT%H%M%S%fZ')}_{label}"
     with httpx.Client(timeout=400) as client:
         modules = [module_metrics(pairs) for _ in range(2)]
-        first, first_rows = suite(client, endpoint, questions, collection)
-        second, second_rows = suite(client, endpoint, questions, collection)
+        first, first_rows = suite(client, endpoint, questions, collection, retrieval_only=retrieval_only)
+        second, second_rows = suite(client, endpoint, questions, collection, retrieval_only=retrieval_only)
         noise, noise_rows = suite(client, endpoint, questions, collection, noise=True)
     first_trace = first_rows[0]["trace"]
     golden_hash = hashlib.sha256(json.dumps(
@@ -178,6 +180,7 @@ def evaluate(
             "chunk_size": settings.chunk_size, "chunk_overlap": settings.chunk_overlap,
             "top_k": first_trace["params"]["top_k"], "llm_name": first_trace["model"], "seed": 0,
             "split": split, "golden_sha256": golden_hash, "question_count": len(questions),
+            "retrieval_only": retrieval_only,
         },
         "module": modules, "run_1": first, "run_2": second, "noise": noise,
         "mean": {key: mean([first[key], second[key]]) for key in ordered_keys},

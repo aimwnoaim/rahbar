@@ -22,7 +22,7 @@ from .coverage import coverage
 from .evaluation import evaluate
 from .ingest import ingest
 from .lake import Lake, lake_writer, write_json
-from .release import gate
+from .release import compare, gate
 from .tracing import reconstruct, summarize, trace_path
 
 
@@ -54,10 +54,15 @@ def main() -> int:
     evaluate_command.add_argument("--out", type=Path, default=Path("eval/results"))
     evaluate_command.add_argument("--label", default="baseline")
     evaluate_command.add_argument("--split", choices=("a", "ab"), default="a")
+    evaluate_command.add_argument("--retrieval-only", action="store_true")
     gate_command = commands.add_parser("gate")
     gate_command.add_argument("--baseline", type=Path, required=True)
     gate_command.add_argument("--candidate", type=Path, required=True)
     gate_command.add_argument("--config", type=Path, default=Path("config/gate.yaml"))
+    comparison = commands.add_parser("compare")
+    comparison.add_argument("--baseline", type=Path, required=True)
+    comparison.add_argument("--candidate", type=Path, required=True)
+    comparison.add_argument("--out", type=Path, required=True)
     coverage_command = commands.add_parser("coverage")
     coverage_command.add_argument("--live", type=Path, required=True)
     coverage_command.add_argument("--golden", type=Path, required=True)
@@ -69,10 +74,14 @@ def main() -> int:
     if args.command == "eval":
         print(evaluate(
             args.target_url, args.collection, args.golden, args.pairs, args.out, args.label, args.split,
+            retrieval_only=args.retrieval_only,
         ))
         return 0
     if args.command == "gate":
         return 0 if gate(args.baseline, args.candidate, args.config) else 1
+    if args.command == "compare":
+        compare(args.baseline, args.candidate, args.out)
+        return 0
     if args.command == "coverage":
         settings = yaml.safe_load(args.config.read_text(encoding="utf-8"))
         result = coverage(args.live, args.golden, args.threshold, args.out)

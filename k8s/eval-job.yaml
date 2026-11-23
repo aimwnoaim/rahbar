@@ -34,19 +34,15 @@ spec:
         command:
         - sh
         - -c
-        - 'set -eu
-
-          result=$(python -m ragops eval --target-url "$TARGET_URL" --collection "$COLLECTION"
-          --split "$DATASET_SPLIT" --out /data/results --label "$COLLECTION")
-
-          printf ''%s
-
-          '' "$result"
-
-          python -m ragops gate --baseline "$BASELINE_PATH" --candidate "$result"
-          --config /gate/gate.yaml
-
-          '
+        - |
+          set -eu
+          result=${EVALUATED_CANDIDATE_PATH:-}
+          if [ -z "$result" ]; then
+            result=$(python -m ragops eval --target-url "$TARGET_URL" --collection "$COLLECTION" \
+              --split "$DATASET_SPLIT" --out /data/results --label "$COLLECTION")
+          fi
+          printf '%s\n' "$result"
+          python -m ragops gate --baseline "$BASELINE_PATH" --candidate "$result" --config /gate/gate.yaml
         volumeMounts:
         - name: data
           mountPath: /data
