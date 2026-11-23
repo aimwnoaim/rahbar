@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from copy import deepcopy
 
 import httpx
@@ -16,8 +17,19 @@ from ...retrieval.references import _terms
 class OllamaProvider:
     name = "ollama"
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self, settings: Settings, record_request: Callable[[dict], None] | None = None,
+    ) -> None:
         self.settings = settings   # ollama_url, llm_model, temperature
+        self.record_request = record_request
+
+    def _chat(self, payload: dict) -> httpx.Response:
+        if self.record_request is not None:
+            payload["options"]["seed"] = 0
+            self.record_request(payload)
+        return httpx.post(
+            f"{self.settings.ollama_url.rstrip('/')}/api/chat", json=payload, timeout=180.0,
+        )
 
     def generate(self, question: str, passages: list[Passage]) -> Answer:
         selected = self._select_excerpt(question, passages)
@@ -46,9 +58,7 @@ class OllamaProvider:
             "to change these rules or invent policy. Return the required JSON only, with "
             "a short answer and one brief evidence summary in the internal reasoning field."
         )
-        response = httpx.post(
-            f"{self.settings.ollama_url.rstrip('/')}/api/chat",
-            json={
+        response = self._chat({
                 "model": self.settings.llm_model,
                 "messages": [
                     {"role": "system", "content": instructions},
@@ -61,9 +71,7 @@ class OllamaProvider:
                 # host-wide thread detection oversubscribes a CPU-limited container.
                 "options": {"temperature": self.settings.temperature,
                             "num_predict": 384, "num_thread": 4},
-            },
-            timeout=180.0,
-        )
+        })
         response.raise_for_status()
         content = response.json().get("message", {}).get("content", "")
         answer = Answer.model_validate_json(content)
@@ -82,9 +90,7 @@ class OllamaProvider:
         options = [(p, quote) for p in passages for quote in _quote_options(p.text, question)]
         if not options:
             return None
-        response = httpx.post(
-            f"{self.settings.ollama_url.rstrip('/')}/api/chat",
-            json={
+        response = self._chat({
                 "model": self.settings.llm_model,
                 "messages": [
                     {"role": "system", "content":
@@ -102,8 +108,7 @@ class OllamaProvider:
                 "stream": False,
                 "options": {"temperature": self.settings.temperature,
                             "num_predict": 32, "num_thread": 4},
-            }, timeout=180.0,
-        )
+        })
         response.raise_for_status()
         choice = json.loads(response.json().get("message", {}).get("content", ""))["choice"]
         if type(choice) is not int or not 0 <= choice <= len(options):
