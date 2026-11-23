@@ -1,0 +1,85 @@
+# RAGOps on local Kubernetes
+
+Run these commands in Bash from the repository root. The separate profile keeps the Assignment 02 cluster available.
+
+```bash
+minikube start -p ragops-dev --driver=docker --container-runtime=containerd --cpus=6 --memory=6144 --keep-context
+minikube addons enable metrics-server -p ragops-dev
+docker build -t rahbar-ragops:dev .
+minikube image load -p ragops-dev rahbar-ragops:dev
+k=(kubectl --context ragops-dev -n ragops)
+"${k[@]}" apply -f k8s/namespace.yaml
+"${k[@]}" apply -f k8s/config.yaml -f k8s/pvc.yaml -f k8s/chroma.yaml -f k8s/ollama.yaml -f k8s/inbox-loader.yaml
+"${k[@]}" rollout status statefulset/chroma --timeout=10m
+"${k[@]}" rollout status deploy/ollama --timeout=10m
+"${k[@]}" rollout status deploy/inbox-loader --timeout=5m
+"${k[@]}" exec deploy/ollama -- ollama pull nomic-embed-text
+"${k[@]}" exec deploy/ollama -- ollama pull qwen2.5:3b
+"${k[@]}" exec deploy/ollama -- ollama list
+```
+
+Compare the embedding model ID with `EMBEDDING_VERSION` in `ragops-config` before recording evidence. Use the existing corpus download workflow, then stage Batch A. Only the ingest job and its CronJob variants invoke lake and vector writes. API pods use a read-only code path, with an explicit flag rejecting CLI writes.
+
+```bash
+python scripts/stage_ragops_batch_a.py --out work/ragops/k8s-batch-a
+loader=$("${k[@]}" get pod -l app.kubernetes.io/name=inbox-loader -o jsonpath='{.items[0].metadata.name}')
+"${k[@]}" exec "$loader" -- mkdir -p /data/inbox
+"${k[@]}" cp work/ragops/k8s-batch-a/. "$loader:/data/inbox"
+"${k[@]}" apply -f k8s/ingest-job.yaml -f k8s/ingest-cronjob.yaml
+"${k[@]}" wait --for=condition=complete job/ingest --timeout=40m
+"${k[@]}" logs job/ingest
+"${k[@]}" exec deploy/inbox-loader -- ls /data/results
+"${k[@]}" apply -f k8s/api.yaml -f k8s/candidate.yaml
+"${k[@]}" rollout status deploy/api --timeout=5m
+"${k[@]}" create job candidate-index --from=cronjob/ingest --dry-run=client -o json |
+  python -c 'import json,sys; j=json.load(sys.stdin); c=j["spec"]["template"]["spec"]["containers"][0]; c["command"]=["python","-m","ragops","--data","/data","sync"]; c["args"]=[]; next(v for v in c["env"] if v["name"]=="CHROMA_COLLECTION")["value"]="rahbar_v2_nomic"; c["env"].append({"name":"CHUNK_SIZE","value":"600"}); print(json.dumps(j))' |
+  "${k[@]}" apply -f -
+"${k[@]}" wait --for=condition=complete job/candidate-index --timeout=25m
+"${k[@]}" rollout status deploy/candidate --timeout=5m
+```
+
+## Gate, rollout and rollback
+
+Measure the baseline against the running API. Save the resulting path as `baseline.json` on the same PVC. Rebuild the Job from JSON to set the real commit SHA as needed.
+
+```bash
+commit=$(git rev-parse HEAD)
+"${k[@]}" exec deploy/api -- sh -c 'GIT_COMMIT="$1" python -m ragops eval --target-url http://api:8000 --collection rahbar_v1_nomic --out /data/results --label baseline' sh "$commit"
+"${k[@]}" exec deploy/inbox-loader -- sh -c 'cp "$(ls -t /data/results/eval_*_baseline.json | head -1)" /data/results/baseline.json'
+kubectl create --dry-run=client -f k8s/eval-job.yaml -o json |
+  python -c 'import json,sys; job=json.load(sys.stdin); next(v for v in job["spec"]["template"]["spec"]["containers"][0]["env"] if v["name"]=="GIT_COMMIT")["value"]=sys.argv[1]; print(json.dumps(job))' "$commit" |
+  "${k[@]}" apply -f -
+"${k[@]}" logs -f job/eval
+"${k[@]}" get job eval
+```
+
+Change a gate limit with `"${k[@]}" edit configmap gate-config`. Delete the eval Job and rerun the preceding creation command. Collect both gate outcomes before changing the live Deployment. The measured release decision belongs in the report.
+
+```bash
+"${k[@]}" annotate deploy/api kubernetes.io/change-cause='candidate passed offline gate' --overwrite
+"${k[@]}" set env deploy/api CHROMA_COLLECTION=rahbar_v2_nomic CHUNK_SIZE=600
+"${k[@]}" rollout status deploy/api
+"${k[@]}" rollout history deploy/api
+"${k[@]}" annotate deploy/api kubernetes.io/change-cause='controlled top-k regression demo' --overwrite
+"${k[@]}" set env deploy/api TOP_K=1
+"${k[@]}" rollout status deploy/api
+"${k[@]}" rollout undo deploy/api
+"${k[@]}" rollout status deploy/api
+"${k[@]}" logs deploy/api --tail=10
+"${k[@]}" port-forward svc/api 8000:8000
+```
+
+From another terminal, submit a query and inspect the trace and metrics. Run `bash scripts/demo.sh` after the candidate gate succeeds to replay evaluation, trace reconstruction and unseen-batch admission. The script stops if evaluation fails.
+
+```bash
+curl -fsS http://127.0.0.1:8000/metrics
+curl -fsS -X POST http://127.0.0.1:8000/query -H 'Content-Type: application/json' \
+  -d '{"question":"How long may I borrow a recorder?"}'
+"${k[@]}" exec deploy/api -- python -m ragops trace TRACE_ID
+"${k[@]}" exec deploy/api -- python -m ragops metrics --since 24h
+"${k[@]}" delete pod chroma-0
+"${k[@]}" rollout status statefulset/chroma --timeout=10m
+"${k[@]}" top pods
+```
+
+Check retrieval again after the restart. Record actual API, Chroma and job resource usage in `eval/results/resources_*.txt` before setting the final requests and limits. The manifest values are initial limits pending workload measurements.
