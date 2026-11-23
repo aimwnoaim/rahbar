@@ -135,7 +135,10 @@ def suite(
     metrics = {
         key: mean(row["scores"][key] for row in details if key in row["scores"]) for key in keys
     }
-    for stage in ("embed", "retrieve", "rerank", "rail", "generate", "total"):
+    stages = ("embed", "retrieve", "rerank", "rail", "total")
+    if not noise and not retrieval_only:
+        stages += ("generate",)
+    for stage in stages:
         timings = [row["trace"]["latency_ms"][stage] for row in details]
         metrics[f"p50_{stage}_ms"] = percentile(timings, 0.50)
         metrics[f"p95_{stage}_ms"] = percentile(timings, 0.95)

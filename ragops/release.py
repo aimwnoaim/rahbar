@@ -79,27 +79,31 @@ def gate(baseline: Path, candidate: Path, config: Path) -> bool:
         raise ValueError("release results must use the same split, seed and generator")
     limits = yaml.safe_load(config.read_text(encoding="utf-8"))
     before, after = prior["mean"], proposed["mean"]
-    missing = {"recall_at_5", "faithfulness", "p95_total_ms", "abstention_correctness"} - before.keys()
-    if missing:
-        print("REJECT — baseline has no measurements for " + ", ".join(sorted(missing)))
-        return False
+    partial = prior["environment"].get("retrieval_only") or proposed["environment"].get("retrieval_only")
+    recall = before.get("recall_at_5")
+    faithfulness = before.get("faithfulness")
+    latency = before.get("p95_total_ms") if not partial else None
     rules = [
-        ("recall_at_5", ">=", max(0, before["recall_at_5"] - limits["recall_at_5_max_drop"])),
-        ("faithfulness", ">=", max(0, before["faithfulness"] - limits["faithfulness_max_drop"])),
-        ("p95_total_ms", "<=", before["p95_total_ms"] * limits["p95_latency_baseline_factor"]),
-        ("abstention_correctness", ">=", before["abstention_correctness"]),
+        ("recall_at_5", ">=", max(0, recall - limits["recall_at_5_max_drop"]) if recall is not None else None),
+        (
+            "faithfulness", ">=",
+            max(0, faithfulness - limits["faithfulness_max_drop"]) if faithfulness is not None else None,
+        ),
+        ("p95_total_ms", "<=", latency * limits["p95_latency_baseline_factor"] if latency is not None else None),
+        ("abstention_correctness", ">=", before.get("abstention_correctness")),
     ]
     print("| Rule | Candidate | Requirement | Result |")
     print("| --- | ---: | ---: | --- |")
     outcomes = []
     for metric, operator, limit in rules:
-        value = after.get(metric)
+        value = after.get(metric) if not partial or metric == "recall_at_5" else None
         valid = (
-            value is not None and math.isfinite(value) and math.isfinite(limit)
+            value is not None and limit is not None and math.isfinite(value) and math.isfinite(limit)
             and (value >= limit if operator == ">=" else value <= limit)
         )
         display = f"{value:.6g}" if value is not None else "missing"
-        print(f"| {metric} | {display} | {operator} {limit:.6g} | {'PASS' if valid else 'FAIL'} |")
+        requirement = f"{operator} {limit:.6g}" if limit is not None else "unmeasured baseline"
+        print(f"| {metric} | {display} | {requirement} | {'PASS' if valid else 'FAIL'} |")
         outcomes.append(valid)
     print("RELEASE" if all(outcomes) else "REJECT")
     return all(outcomes)

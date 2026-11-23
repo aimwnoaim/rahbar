@@ -35,6 +35,7 @@
 | Full Batch A | 10 | 8 | 1 | 1 | 724 | 0 | [Verification](../eval/results/verification_report_20261123T193246Z-8e991eba.json), [incremental](../eval/results/incremental_20261123T193246Z-8e991eba.json) |
 | Batch B against authored Batch A fixture | 11 | 5 | 1 | 5 | 6 | 1 | [Verification](../eval/results/verification_report_20261123T194050Z-9cf18ab7.json), [incremental](../eval/results/incremental_20261123T194050Z-9cf18ab7.json) |
 | Batch B against full Batch A | 11 | 5 | 1 | 5 | 6 | 1 | [Verification](../eval/results/verification_report_20261123T200954Z-f924f005.json), [incremental](../eval/results/incremental_20261123T200954Z-f924f005.json) |
+| Unchanged full Batch A | 10 | 0 | 0 | 2 | 0 | 0 | [Verification](../eval/results/verification_report_20261123T202520Z-d6eb3766.json), [incremental](../eval/results/incremental_20261123T202520Z-d6eb3766.json) |
 | Unchanged authored fixture | 1 | 0 | 0 | 0 | 0 | 0 | [Incremental](../eval/results/incremental_fixture_unchanged.json) |
 
 The full Batch A run flagged the 2023–24 annual report as a near duplicate of the 2019–20 report at cosine 0.951385. The report titles identify different periods. This is a likely false positive from shared structure and boilerplate. [Full Batch A verification](../eval/results/verification_report_20261123T193246Z-8e991eba.json)
@@ -43,9 +44,28 @@ With the fixture inbox changed to remove the locker policy, reconciliation delet
 
 ## B and C. Evaluation and release
 
-The three-level evaluation, noise, seeded differences and candidate decision require completed baseline and candidate result files. The configured thresholds are in `config/gate.yaml`. Release status is pending.
+The full Batch A retrieval-only suite completed both seeded passes and the typo test. It measures the embedding and retrieval layers. Full-corpus end-to-end scores are pending.
+
+| Baseline module or retrieval metric | Mean | Absolute difference | Typo delta |
+| --- | ---: | ---: | ---: |
+| Paraphrase cosine | 0.723273 | 0 | — |
+| Unrelated cosine | 0.358703 | 0 | — |
+| Cosine gap | 0.36457 | 0 | — |
+| Embedding per text, mean ms | 1436.26 | 493.296 | — |
+| Embedding per text, p95 ms | 1999.89 | 326.355 | — |
+| Maximum repeated vector difference | 0 | 0 | — |
+| recall_at_3 | 0.909091 | 0 | +0 |
+| recall_at_5 | 0.954545 | 0 | -0.0454545 |
+| precision_at_5 | 0.190909 | 0 | -0.00909091 |
+| mrr | 0.819697 | 0 | +0.0363636 |
+| ndcg_at_5 | 0.85362 | 0 | +0.0159676 |
+| p95_retrieve_ms | 190.874 | 154.861 | +76.8335 |
+
+[Batch A retrieval-only scores](../eval/results/retrieval_eval_20261123T201146183667Z_batch_a.json) · [Per-question retrieval output](../eval/results/retrieval_eval_20261123T201146183667Z_batch_a_details.jsonl)
 
 The 600-word candidate reused 633 vectors from byte-identical baseline chunks, kept 64 previously indexed vectors and embedded 18 remaining chunks. [Candidate reconciliation](../eval/results/candidate_sync.json)
+
+The 600-word candidate is rejected on the measured retrieval requirement. Recall@5 fell from 95.45% to 90.91%, a 4.55 percentage-point drop. The gate recorded the failed recall rule and withheld release because full end-to-end values were also pending. [Candidate comparison](../eval/results/comparison_retrieval_candidate.md), [gate output](../eval/results/gate_retrieval_candidate.txt)
 
 ## D. Observability
 
@@ -67,6 +87,8 @@ The calibration computes the midpoint between the mean cosine scores of paraphra
 
 At the calibrated cutoff of 0.540988, coverage was 65% before expansion and 100% afterward. The original set returned exit code 1 and the expanded set returned 0. The expanded set deliberately targets uncovered live topics, including abstention for unsupported topics. Its coverage is an in-sample demonstration. [Calibrated before](../eval/results/coverage_20261123T194748858957Z.json), [calibrated after](../eval/results/coverage_20261123T194915958965Z.json)
 
+The retrieval-only Batch B comparison measured 29 shared questions with hits before and after. The top-ranked document or version changed on 2 of those questions. Mean top-hit similarity moved by +0.000256. The aggregate tables also include the new Batch B questions, so the shared-question comparison isolates the original cohort. [Batch B retrieval comparison](../eval/results/comparison_retrieval_batch_ab.json)
+
 ## F. Kubernetes
 
 The fresh `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. Fixture ingestion ran in the Kubernetes Job. Live and candidate Deployments reached readiness, the API rejected a write attempt, and the fixture chunk survived a Chroma pod restart. The Kubernetes workloads called the pinned local Ollama through a temporary relay while the in-cluster Ollama image pull was stalled. [Ingest Job](../eval/results/k8s_fixture_ingest.json), [API write rejection](../eval/results/k8s_api_readonly.txt), [persistence](../eval/results/k8s_chroma_persistence.txt)
@@ -86,11 +108,11 @@ The Kubernetes smoke baseline finished. The first candidate Job received an HTTP
 
 **(a)** Uniqueness caught both copied documents and the lightly edited duplicate. Completeness caught the missing title and missing page. The locker document passed verification and was flagged as suspicious. A retrieval rail can remove instruction-like chunks before generation. Meaning-changing or indirect instructions can evade pattern matching. [Batch B verification](../eval/results/verification_report_20261123T194050Z-9cf18ab7.json)
 
-**(b)** Use one example from the measured module, ranked retrieval and per-question generation outputs once the three-level runs finish.
+**(b)** Embedding separation and repeatability looked consistent, but the question about the online A+ grading table missed the expected grading page. The Academic Rules Handbook supplied related grading passages. This shows that global embedding separation can coexist with a source-specific retrieval miss. [Per-question retrieval output](../eval/results/retrieval_eval_20261123T201146183667Z_batch_a_details.jsonl)
 
 **(c)** Archiving preserves the bytes and provenance needed to restore an old version and reproduce a citation. Deleting lake bytes eliminates those recovery options. Removing its derived chunks keeps stale content outside the active index.
 
-**(d)** Faithfulness measures whether the generator quotes the selected evidence. A fully supported quote can still address the wrong policy, which is why correctness and retrieval labels are scored separately.
+**(d)** Faithfulness measures whether the generator quotes the selected evidence. A fully supported quote can still address the wrong policy, which is why correctness and retrieval labels are scored separately. This illustrates the paper's measurement challenge in §6.2.
 
 **(e)** The difficult design trade-off is semantic verification across long documents. Shared report structure can make independently valid reports look redundant. The recorded Batch A false positive is evidence of that limitation. [Full Batch A verification](../eval/results/verification_report_20261123T193246Z-8e991eba.json)
 

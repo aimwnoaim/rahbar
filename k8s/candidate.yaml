@@ -63,12 +63,14 @@ spec:
             port: 8000
           periodSeconds: 5
           failureThreshold: 3
+          timeoutSeconds: 5
         livenessProbe:
           httpGet:
             path: /healthz
             port: 8000
           periodSeconds: 5
           failureThreshold: 3
+          timeoutSeconds: 3
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
