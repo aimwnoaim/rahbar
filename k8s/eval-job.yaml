@@ -31,8 +31,6 @@ spec:
           value: /data/results/baseline.json
         - name: RAGOPS_READ_ONLY
           value: 'true'
-        - name: GIT_COMMIT
-          value: local-image
         command:
         - sh
         - -c

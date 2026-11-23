@@ -38,6 +38,8 @@
 
 The full Batch A run flagged the 2023–24 annual report as a near duplicate of the 2019–20 report at cosine 0.951385. The report titles identify different periods. This is a likely false positive from shared structure and boilerplate. [Full Batch A verification](../eval/results/verification_report_20261123T193246Z-8e991eba.json)
 
+With the fixture inbox changed to remove the locker policy, reconciliation deleted its chunk and found no orphans. The restored recorder revision then replaced the active chunk. [Deletion](../eval/results/incremental_20261123T195520Z-6e4d692a.json), [restore](../eval/results/restore_fixture.json)
+
 ## B and C. Evaluation and release
 
 The three-level evaluation, noise, seeded differences and candidate decision require completed baseline and candidate result files. The configured thresholds are in `config/gate.yaml`. Release status is pending.

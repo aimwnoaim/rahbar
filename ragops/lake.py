@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sqlite3
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -36,11 +39,25 @@ def safe_id(value: str) -> str:
     return value
 
 
+@contextmanager
+def lake_writer(root: Path) -> Iterator[None]:
+    """Serialize writes from manual Jobs and the scheduled ingestion workload."""
+    directory = root / "lake"
+    directory.mkdir(parents=True, exist_ok=True)
+    with closing(sqlite3.connect(directory / ".writer.sqlite3", timeout=30)) as lock:
+        lock.execute("BEGIN IMMEDIATE")
+        try:
+            yield
+        finally:
+            lock.rollback()
+
+
 class Lake:
     """One writer owns the manifest. Immutable revision bytes survive interrupted runs."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, preview: bool = False) -> None:
         self.root = root
+        self.preview = preview
         self.manifest_path = root / "lake" / "manifest.json"
         self.manifest: dict[str, Any] = (
             json.loads(self.manifest_path.read_text(encoding="utf-8"))
@@ -63,7 +80,8 @@ class Lake:
             "version": version,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
-        write_json(self.manifest_path, self.manifest)
+        if not self.preview:
+            write_json(self.manifest_path, self.manifest)
 
     def materialize_current(self) -> None:
         """Project active bytes from the authoritative revision manifest."""
@@ -91,11 +109,12 @@ class Lake:
     ) -> tuple[Verification, str]:
         result = verify(document, self.fingerprints(), embed, near_threshold, min_length)
         if not result.accepted or result.fingerprint is None:
-            destination = self.root / "quarantine" / safe_id(run_id) / uuid4().hex
-            atomic_write(destination / ("source" + suffix), raw)
-            write_json(destination / "record.json", {
-                "document": asdict(document), "verification": asdict(result),
-            })
+            if not self.preview:
+                destination = self.root / "quarantine" / safe_id(run_id) / uuid4().hex
+                atomic_write(destination / ("source" + suffix), raw)
+                write_json(destination / "record.json", {
+                    "document": asdict(document), "verification": asdict(result),
+                })
             return result, "quarantined"
 
         doc_id = safe_id(document.doc_id)
@@ -112,7 +131,8 @@ class Lake:
             return result, "unchanged"
 
         relative = Path("lake", "archive", doc_id, version)
-        atomic_write(self.root / relative / ("source" + suffix), raw)
+        if not self.preview:
+            atomic_write(self.root / relative / ("source" + suffix), raw)
         stored = {
             "document": serialized,
             "fingerprint": asdict(result.fingerprint),

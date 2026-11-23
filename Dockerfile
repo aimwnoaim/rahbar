@@ -16,5 +16,7 @@ COPY config ./config
 COPY eval ./eval
 COPY data ./data
 COPY scripts/stage_ragops_batch_a.py ./scripts/stage_ragops_batch_a.py
+ARG GIT_COMMIT
+ENV GIT_COMMIT=${GIT_COMMIT}
 USER 10001:10001
 CMD ["python", "-m", "uvicorn", "ragops.api:app", "--host", "0.0.0.0", "--port", "8000"]

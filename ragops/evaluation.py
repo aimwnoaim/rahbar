@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
 import re
@@ -85,14 +86,18 @@ def module_metrics(path: Path) -> dict[str, Any]:
     timings = []
     details = []
     for kind, entries in pairs.items():
-        for left, right in entries:
+        for start_index in range(0, len(entries), 8):
+            batch = entries[start_index:start_index + 8]
             start = perf_counter()
-            vectors = embed([left, right], settings)
-            latency = (perf_counter() - start) * 500
-            timings.append(latency)
-            score = cosine(*vectors)
-            values[kind].append(score)
-            details.append({"kind": kind, "left": left, "right": right, "cosine": score, "ms_per_text": latency})
+            vectors = iter(embed([text for pair in batch for text in pair], settings))
+            latency = (perf_counter() - start) * 1000 / (2 * len(batch))
+            for left, right in batch:
+                score = cosine(next(vectors), next(vectors))
+                timings.append(latency)
+                values[kind].append(score)
+                details.append({
+                    "kind": kind, "left": left, "right": right, "cosine": score, "ms_per_text": latency,
+                })
     first = embed([pairs["paraphrase"][0][0]], settings)[0]
     second = embed([pairs["paraphrase"][0][0]], settings)[0]
     return {
@@ -114,13 +119,18 @@ def suite(
         if noise:
             text = re.sub(r"\b([A-Za-z])([A-Za-z])([A-Za-z]{4,})", r"\2\1\3", text, count=1)
         response = client.post(
-            f"{endpoint.rstrip('/')}/query", params={"bypass_cache": "true"}, json={"question": text},
+            f"{endpoint.rstrip('/')}/query",
+            params={"bypass_cache": "true", "retrieval_only": str(noise).lower()},
+            json={"question": text},
         )
         response.raise_for_status()
         trace = response.json()
         if trace["collection"] != collection:
             raise ValueError(f"evaluation requested {collection} but API used {trace['collection']}")
-        details.append({"golden": question, "trace": trace, "scores": grade(question, trace)})
+        scores = grade(question, trace)
+        if noise:
+            scores = {key: value for key, value in scores.items() if key in rank_metrics(None)}
+        details.append({"golden": question, "trace": trace, "scores": scores})
     keys = sorted({key for row in details for key in row["scores"]})
     metrics = {
         key: mean(row["scores"][key] for row in details if key in row["scores"]) for key in keys
@@ -153,6 +163,9 @@ def evaluate(
         second, second_rows = suite(client, endpoint, questions, collection)
         noise, noise_rows = suite(client, endpoint, questions, collection, noise=True)
     first_trace = first_rows[0]["trace"]
+    golden_hash = hashlib.sha256(json.dumps(
+        questions, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
     source_commit = os.getenv("GIT_COMMIT")
     if not source_commit:
         source_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -164,7 +177,7 @@ def evaluate(
             "embedding_model": first_trace["embedding_model"], "embedding_version": first_trace["embedding_version"],
             "chunk_size": settings.chunk_size, "chunk_overlap": settings.chunk_overlap,
             "top_k": first_trace["params"]["top_k"], "llm_name": first_trace["model"], "seed": 0,
-            "split": split,
+            "split": split, "golden_sha256": golden_hash, "question_count": len(questions),
         },
         "module": modules, "run_1": first, "run_2": second, "noise": noise,
         "mean": {key: mean([first[key], second[key]]) for key in ordered_keys},

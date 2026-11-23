@@ -5,7 +5,7 @@ Run these commands in Bash from the repository root. The separate profile keeps 
 ```bash
 minikube start -p ragops-dev --driver=docker --container-runtime=containerd --cpus=6 --memory=6144 --keep-context
 minikube addons enable metrics-server -p ragops-dev
-docker build -t rahbar-ragops:dev .
+docker build --build-arg GIT_COMMIT="$(git rev-parse HEAD)" -t rahbar-ragops:dev .
 minikube image load -p ragops-dev rahbar-ragops:dev
 k=(kubectl --context ragops-dev -n ragops)
 "${k[@]}" apply -f k8s/namespace.yaml
@@ -40,15 +40,13 @@ loader=$("${k[@]}" get pod -l app.kubernetes.io/name=inbox-loader -o jsonpath='{
 
 ## Gate, rollout and rollback
 
-Measure the baseline against the running API. Save the resulting path as `baseline.json` on the same PVC. Rebuild the Job from JSON to set the real commit SHA as needed.
+Measure the baseline against the running API. Save the resulting path as `baseline.json` on the same PVC. The image records the commit SHA supplied at build time.
 
 ```bash
 commit=$(git rev-parse HEAD)
 "${k[@]}" exec deploy/api -- sh -c 'GIT_COMMIT="$1" python -m ragops eval --target-url http://api:8000 --collection rahbar_v1_nomic --out /data/results --label baseline' sh "$commit"
 "${k[@]}" exec deploy/inbox-loader -- sh -c 'cp "$(ls -t /data/results/eval_*_baseline.json | head -1)" /data/results/baseline.json'
-kubectl create --dry-run=client -f k8s/eval-job.yaml -o json |
-  python -c 'import json,sys; job=json.load(sys.stdin); next(v for v in job["spec"]["template"]["spec"]["containers"][0]["env"] if v["name"]=="GIT_COMMIT")["value"]=sys.argv[1]; print(json.dumps(job))' "$commit" |
-  "${k[@]}" apply -f -
+"${k[@]}" apply -f k8s/eval-job.yaml
 "${k[@]}" logs -f job/eval
 "${k[@]}" get job eval
 ```
@@ -61,7 +59,7 @@ Change a gate limit with `"${k[@]}" edit configmap gate-config`. Delete the eval
 "${k[@]}" rollout status deploy/api
 "${k[@]}" rollout history deploy/api
 "${k[@]}" annotate deploy/api kubernetes.io/change-cause='controlled top-k regression demo' --overwrite
-"${k[@]}" set env deploy/api TOP_K=1
+"${k[@]}" set env deploy/api CHROMA_COLLECTION=rahbar_v1_nomic CHUNK_SIZE=400 TOP_K=1
 "${k[@]}" rollout status deploy/api
 "${k[@]}" rollout undo deploy/api
 "${k[@]}" rollout status deploy/api

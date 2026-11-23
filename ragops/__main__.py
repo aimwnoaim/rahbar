@@ -21,7 +21,7 @@ from .index import synchronize
 from .coverage import coverage
 from .evaluation import evaluate
 from .ingest import ingest
-from .lake import Lake, write_json
+from .lake import Lake, lake_writer, write_json
 from .release import gate
 from .tracing import reconstruct, summarize, trace_path
 
@@ -84,8 +84,16 @@ def main() -> int:
         return 0
     if os.getenv("RAGOPS_READ_ONLY", "").lower() == "true":
         parser.error("this workload is configured read-only and cannot modify the lake or index")
-    lake = Lake(args.data)
+    if args.command == "verify":
+        return update_lake(args, parser, Lake(args.data, preview=True))
+    with lake_writer(args.data):
+        return update_lake(args, parser, Lake(args.data))
+
+
+def update_lake(args: argparse.Namespace, parser: argparse.ArgumentParser, lake: Lake) -> int:
     settings = get_settings()
+    if args.command != "verify" and not 0 <= settings.chunk_overlap < settings.chunk_size:
+        parser.error("chunk overlap must be nonnegative and smaller than chunk size")
     embed_text = partial(embed, settings=settings)
     counts = {}
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid4().hex[:8]
@@ -97,26 +105,26 @@ def main() -> int:
             min_length=args.min_length, snapshot=args.snapshot,
         )
         counts = result["counts"]
+    if args.command == "verify":
+        print(json.dumps(counts, indent=2))
+        return 0
     if args.command == "restore":
         lake.restore(args.doc_id, args.version)
     lake.materialize_current()
-    if args.command != "verify":
-        if not 0 <= settings.chunk_overlap < settings.chunk_size:
-            parser.error("chunk overlap must be nonnegative and smaller than chunk size")
-        collection = get_client(settings).get_or_create_collection(
-            settings.collection, metadata={
-                "embed_model": settings.embed_model,
-                "embedding_version": os.getenv("EMBEDDING_VERSION", "unrecorded"),
-            },
-            configuration={"hnsw": {"space": "cosine"}},
-        )
-        if collection.metadata.get("embed_model") != settings.embed_model:
-            raise ValueError("collection embedding model differs from configuration")
-        counts.update(synchronize(
-            collection, lake, embed_text, settings.chunk_size, settings.chunk_overlap,
-        ))
-        metadata = {key: value for key, value in collection.metadata.items() if key != "hnsw:space"}
-        collection.modify(metadata=metadata | {"lake_revision": lake.manifest["revision"]})
+    collection = get_client(settings).get_or_create_collection(
+        settings.collection, metadata={
+            "embed_model": settings.embed_model,
+            "embedding_version": os.getenv("EMBEDDING_VERSION", "unrecorded"),
+        },
+        configuration={"hnsw": {"space": "cosine"}},
+    )
+    if collection.metadata.get("embed_model") != settings.embed_model:
+        raise ValueError("collection embedding model differs from configuration")
+    counts.update(synchronize(
+        collection, lake, embed_text, settings.chunk_size, settings.chunk_overlap,
+    ))
+    metadata = {key: value for key, value in collection.metadata.items() if key != "hnsw:space"}
+    collection.modify(metadata=metadata | {"lake_revision": lake.manifest["revision"]})
     if args.command == "ingest":
         write_json(args.out / f"incremental_{run_id}.json", counts)
     print(json.dumps(counts, indent=2))

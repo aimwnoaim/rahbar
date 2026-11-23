@@ -29,7 +29,10 @@ _CACHE: OrderedDict[tuple[str, str, str], dict[str, Any]] = OrderedDict()
 _CACHE_LOCK = Lock()
 
 
-def query(question: str, collection: Any, settings: Any, *, bypass_cache: bool = False) -> dict[str, Any]:
+def query(
+    question: str, collection: Any, settings: Any, *, bypass_cache: bool = False,
+    retrieval_only: bool = False,
+) -> dict[str, Any]:
     started = perf_counter()
     settings_api = replace(api_config.get_settings(), temperature=0.0, ollama_url=settings.ollama_url)
     version = os.environ["EMBEDDING_VERSION"]
@@ -39,7 +42,7 @@ def query(question: str, collection: Any, settings: Any, *, bypass_cache: bool =
     key = (settings.collection, revision, question)
     phases = dict.fromkeys(("embed", "retrieve", "rerank", "rail", "generate"), 0.0)
     with _CACHE_LOCK:
-        cached = None if bypass_cache else _CACHE.get(key)
+        cached = None if bypass_cache or retrieval_only else _CACHE.get(key)
         if cached is not None:
             _CACHE.move_to_end(key)
     if cached is None:
@@ -84,7 +87,7 @@ def query(question: str, collection: Any, settings: Any, *, bypass_cache: bool =
             "answer": "The available documents do not establish an answer to this question.",
             "answered_from_context": False, "confidence": "low", "citations": [],
         }
-        if context:
+        if context and not retrieval_only:
             provider = OllamaProvider(settings_api, record_request=requests.append)
             passages = [Passage.model_validate(row) for row in context]
             for _ in range(2):
@@ -121,6 +124,7 @@ def query(question: str, collection: Any, settings: Any, *, bypass_cache: bool =
         "citations": computed["response"]["citations"],
         "latency_ms": phases | {"total": (perf_counter() - started) * 1000},
         "cache": "miss" if cached is None else "hit",
+        "retrieval_only": retrieval_only,
     }
     append_trace(trace_path(), trace)
     return trace
@@ -149,10 +153,13 @@ def ready() -> dict[str, str]:
 
 
 @app.post("/query")
-def ask(payload: AskRequest, bypass_cache: bool = False) -> dict[str, Any]:
+def ask(payload: AskRequest, bypass_cache: bool = False, retrieval_only: bool = False) -> dict[str, Any]:
     settings = get_settings()
     try:
-        return query(payload.question, get_collection(settings), settings, bypass_cache=bypass_cache)
+        return query(
+            payload.question, get_collection(settings), settings,
+            bypass_cache=bypass_cache, retrieval_only=retrieval_only,
+        )
     except (httpx.HTTPError, ValueError) as error:
         raise HTTPException(status_code=502, detail="pipeline could not complete the query") from error
 

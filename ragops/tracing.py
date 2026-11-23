@@ -51,7 +51,10 @@ def percentile(values: list[float], quantile: float) -> float | None:
 
 def summarize(path: Path, hours: float) -> dict[str, Any]:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
-    traces = [row for row in records(path) if datetime.fromisoformat(row["timestamp"]) >= cutoff]
+    traces = [
+        row for row in records(path)
+        if not row.get("retrieval_only") and datetime.fromisoformat(row["timestamp"]) >= cutoff
+    ]
     count = len(traces)
     scores = [trace["retrieved"][0]["score"] for trace in traces if trace["retrieved"]]
     bounds = (0.0, 0.25, 0.5, 0.75, 1.0)

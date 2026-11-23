@@ -57,8 +57,8 @@ def synchronize(
     ]
     deleted = sorted(indexed.keys() - expected.keys())
     embedded = 0
-    for start in range(0, len(upserts), 64):
-        batch = upserts[start:start + 64]
+    for start in range(0, len(upserts), 16):
+        batch = upserts[start:start + 16]
         existing_ids = [
             item.id for item in batch
             if item.id in indexed
