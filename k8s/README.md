@@ -47,7 +47,7 @@ loader=$("${k[@]}" get pod -l app.kubernetes.io/name=inbox-loader -o jsonpath='{
 "${k[@]}" apply -f k8s/api.yaml -f k8s/candidate.yaml
 "${k[@]}" rollout status deploy/api --timeout=5m
 "${k[@]}" create job candidate-index --from=cronjob/ingest --dry-run=client -o json |
-  python -c 'import json,sys; j=json.load(sys.stdin); c=j["spec"]["template"]["spec"]["containers"][0]; c["command"]=["python","-m","ragops","--data","/data","sync"]; c["args"]=[]; next(v for v in c["env"] if v["name"]=="CHROMA_COLLECTION")["value"]="rahbar_v2_nomic"; c["env"].append({"name":"CHUNK_SIZE","value":"600"}); print(json.dumps(j))' |
+  python -c 'import json,sys; j=json.load(sys.stdin); c=j["spec"]["template"]["spec"]["containers"][0]; c["command"]=["python","-m","ragops","--data","/data","sync"]; c["args"]=[]; next(v for v in c["env"] if v["name"]=="CHROMA_COLLECTION")["value"]="rahbar_v3_nomic"; c["env"].append({"name":"CHUNK_SIZE","value":"420"}); print(json.dumps(j))' |
   "${k[@]}" apply -f -
 "${k[@]}" wait --for=condition=complete job/candidate-index --timeout=25m
 "${k[@]}" rollout status deploy/candidate --timeout=5m
@@ -72,7 +72,7 @@ To isolate a threshold change, run the same Job with `EVALUATED_CANDIDATE_PATH` 
 
 ```bash
 "${k[@]}" annotate deploy/api kubernetes.io/change-cause='candidate passed offline gate' --overwrite
-"${k[@]}" set env deploy/api CHROMA_COLLECTION=rahbar_v2_nomic CHUNK_SIZE=600
+"${k[@]}" set env deploy/api CHROMA_COLLECTION=rahbar_v3_nomic CHUNK_SIZE=420
 "${k[@]}" rollout status deploy/api
 "${k[@]}" rollout history deploy/api
 "${k[@]}" annotate deploy/api kubernetes.io/change-cause='controlled top-k regression demo' --overwrite
@@ -85,6 +85,8 @@ To isolate a threshold change, run the same Job with `EVALUATED_CANDIDATE_PATH` 
 ```
 
 From another terminal, submit a query and inspect the trace and metrics. Run `bash scripts/demo.sh` after the candidate gate succeeds to replay evaluation, trace reconstruction and unseen-batch admission. The script stops if evaluation fails.
+
+After a permanent approved release, align the scheduled writer with the live collection using `"${k[@]}" set env cronjob/ingest CHROMA_COLLECTION=rahbar_v3_nomic CHUNK_SIZE=420`.
 
 ```bash
 curl -fsS http://127.0.0.1:8000/metrics

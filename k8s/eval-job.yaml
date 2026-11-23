@@ -22,9 +22,9 @@ spec:
         - name: TARGET_URL
           value: http://candidate:8000
         - name: COLLECTION
-          value: rahbar_v2_nomic
+          value: rahbar_v3_nomic
         - name: CHUNK_SIZE
-          value: '600'
+          value: '420'
         - name: DATASET_SPLIT
           value: a
         - name: BASELINE_PATH

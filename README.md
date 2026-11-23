@@ -219,7 +219,7 @@ The Assignment 03 CLI is `python -m ragops`. Run in an environment with the API 
 
 For the new API outside Kubernetes, run `python -m uvicorn ragops.api:app --port 8000`. To repeat the evaluation after Batch B, pass `--split ab` and a new label. For the expanded coverage check, use `eval/golden_expanded.jsonl`.
 
-For a candidate sync, set `CHROMA_COLLECTION=rahbar_v2_nomic` and `CHUNK_SIZE=600` while keeping the baseline embedding version and overlap. Run `python -m ragops --data work/ragops/lake sync --reuse-from rahbar_v1_nomic`. The optional `eval --retrieval-only` mode emits separate module and retrieval evidence for diagnosing a slow or unavailable generator.
+For the passing candidate, set `CHROMA_COLLECTION=rahbar_v3_nomic` and `CHUNK_SIZE=420` while keeping the baseline embedding version and overlap. Run `python -m ragops --data work/ragops/lake sync --reuse-from rahbar_v1_nomic`. The optional `eval --retrieval-only` mode emits separate module and retrieval evidence for diagnosing a slow or unavailable generator.
 
 [Design explanation](docs/EXPLAIN.md) · [Worklog](docs/RAGOPS-WORKLOG.md) · [Report notes](docs/REPORT_NOTES.md) · [Screenshot checklist](docs/SCREENSHOT_CHECKLIST.md)
 

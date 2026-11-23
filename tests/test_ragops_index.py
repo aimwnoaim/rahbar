@@ -1,3 +1,6 @@
+import httpx
+
+from ragops import index as ragops_index
 from ragops.index import synchronize
 from ragops.lake import Lake
 from ragops.verify import Source
@@ -47,3 +50,16 @@ def test_index_reconciles_update_delete_and_restore(tmp_path):
     counts = synchronize(fork, lake, embed, 600, 50, reuse=collection)
     assert counts["chunks_embedded"] == 0
     assert counts["chunks_reused"] == 1
+
+
+def test_index_retries_transient_transport_errors(monkeypatch):
+    attempts = []
+
+    def write(ids):
+        attempts.append(ids)
+        if len(attempts) == 1:
+            raise httpx.ConnectError("temporary DNS failure")
+
+    monkeypatch.setattr(ragops_index, "sleep", lambda _: None)
+    ragops_index.write_with_retry(write, ids=["a"])
+    assert attempts == [["a"], ["a"]]

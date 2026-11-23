@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -40,12 +42,20 @@ def coverage(live_path: Path, golden_path: Path, threshold: float, out: Path) ->
                 "label": item.get("topic", item["question"]),
                 "representative": vector, "queries": [item["question"]],
             })
+    now = datetime.now(timezone.utc)
     result = {
         "threshold": threshold, "coverage": sum(row["covered"] for row in matches) / len(matches),
+        "environment": {
+            "timestamp": now.isoformat(),
+            "embedding_model": settings.embed_model,
+            "embedding_version": os.getenv("EMBEDDING_VERSION"),
+            "live_sha256": hashlib.sha256(live_path.read_bytes()).hexdigest(),
+            "golden_sha256": hashlib.sha256(golden_path.read_bytes()).hexdigest(),
+        },
         "queries": matches,
         "uncovered_topics": [{"label": row["label"], "queries": row["queries"]} for row in clusters],
     }
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    stamp = now.strftime("%Y%m%dT%H%M%S%fZ")
     output = out / f"coverage_{stamp}.json"
     write_json(output, result)
     print(f"Coverage: {result['coverage']:.2%} at cosine {threshold:.3f} ({output})")

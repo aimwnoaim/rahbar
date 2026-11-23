@@ -34,9 +34,32 @@ trace_id=$(python -c 'import json,sys; print(json.load(sys.stdin)["trace_id"])' 
 loader=$("${k[@]}" get pod -l app.kubernetes.io/name=inbox-loader -o jsonpath='{.items[0].metadata.name}')
 "${k[@]}" exec "$loader" -- mkdir -p /data/demo-inbox
 "${k[@]}" cp data/demo_batch/. "$loader:/data/demo-inbox"
+
+read -r live_collection live_chunk_size < <(
+  "${k[@]}" get deployment api -o json |
+    python -c '
+import json
+import sys
+
+container = json.load(sys.stdin)["spec"]["template"]["spec"]["containers"][0]
+settings = {variable["name"]: variable.get("value") for variable in container["env"]}
+print(settings["CHROMA_COLLECTION"], settings.get("CHUNK_SIZE", "400"))
+'
+)
 "${k[@]}" delete job demo-ingest --ignore-not-found
 "${k[@]}" create job demo-ingest --from=cronjob/ingest --dry-run=client -o json |
-  python -c 'import json,sys; job=json.load(sys.stdin); job["spec"]["template"]["spec"]["containers"][0]["args"]=["--inbox","/data/demo-inbox","--out","/data/results"]; print(json.dumps(job))' |
+  python -c '
+import json
+import sys
+
+job = json.load(sys.stdin)
+container = job["spec"]["template"]["spec"]["containers"][0]
+container["args"] = ["--inbox", "/data/demo-inbox", "--out", "/data/results"]
+live = {"CHROMA_COLLECTION": sys.argv[1], "CHUNK_SIZE": sys.argv[2]}
+container["env"] = [variable for variable in container["env"] if variable["name"] not in live]
+container["env"].extend({"name": name, "value": value} for name, value in live.items())
+print(json.dumps(job))
+' "$live_collection" "$live_chunk_size" |
   "${k[@]}" apply -f -
 "${k[@]}" wait --for=condition=complete job/demo-ingest --timeout=5m
 "${k[@]}" logs job/demo-ingest

@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import hashlib
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from time import sleep
 from typing import Any
+
+import httpx
 
 from indexer.pipeline.chunk import chunk
 from indexer.pipeline.clean import clean
@@ -45,6 +48,18 @@ def rows(collection: Any, include: list[str]) -> Iterator[dict[str, Any]]:
         offset += len(page["ids"])
         if len(page["ids"]) < 256:
             return
+
+
+def write_with_retry(operation: Callable[..., Any], **parameters: Any) -> None:
+    """Replay idempotent writes when a rolling backend restart interrupts transport."""
+    delays = (1, 3, 8, 16, 32)
+    for delay in delays:
+        try:
+            operation(**parameters)
+            return
+        except httpx.TransportError:
+            sleep(delay)
+    operation(**parameters)
 
 
 def synchronize(
@@ -93,14 +108,15 @@ def synchronize(
                 (item.id for item in missing), embed([item.text for item in missing]), strict=True,
             ))
         embedded += len(missing)
-        collection.upsert(
+        write_with_retry(
+            collection.upsert,
             ids=[item.id for item in batch],
             documents=[item.text for item in batch],
             metadatas=[item.metadata for item in batch],
             embeddings=[vectors[item.id] for item in batch],
         )
     for start in range(0, len(deleted), 256):
-        collection.delete(ids=deleted[start:start + 256])
+        write_with_retry(collection.delete, ids=deleted[start:start + 256])
 
     final = {row["id"]: row["metadatas"] for row in rows(collection, ["metadatas"])}
     if set(final) != set(expected) or any(final[item.id] != item.metadata for item in expected.values()):

@@ -84,6 +84,10 @@ The 600-word candidate is rejected on the measured retrieval requirement. Recall
 
 The full baseline and 600-word candidate were also compared across all three levels. [Full candidate comparison](../eval/results/comparison_candidate.md), [full candidate gate](../eval/results/gate_candidate.txt)
 
+The deliberate top-k=1 regression also failed the full gate. Recall@5 fell from 95.45% to 72.73% on the same Batch A questions. [Deliberate regression comparison](../eval/results/comparison_top1.md), [gate](../eval/results/gate_top1.txt)
+
+The 420-word candidate passed every full gate rule. It retained the baseline recall@5 and passed the measured faithfulness, latency and abstention limits. It is the configuration selected for release review. [420-word baseline comparison](../eval/results/comparison_candidate_420.md), [passing gate](../eval/results/gate_candidate_420.txt), [candidate configuration](../config/candidate.yaml)
+
 ## D. Observability
 
 The trace saves retrieved text, ranking, rail actions, filtered generation context and the complete Ollama request bodies.
@@ -108,6 +112,23 @@ At the calibrated cutoff of 0.540988, coverage was 65% before expansion and 100%
 
 The retrieval-only Batch B comparison measured 29 shared questions with hits before and after. The top-ranked document or version changed on 2 of those questions. Mean top-hit similarity moved by +0.000256. The aggregate tables also include the new Batch B questions, so the shared-question comparison isolates the original cohort. [Batch B retrieval comparison](../eval/results/comparison_retrieval_batch_ab.json)
 
+The coverage rerun with the owner's questions measured 65.00% before and 100.00% after expansion. It preserved the fail/pass behavior. [Final before](../eval/results/coverage_20261123T205246044150Z.json), [final after](../eval/results/coverage_20261123T205330610091Z.json), [exit codes](../eval/results/coverage_final_exit_codes.json)
+
+| Full-suite metric | Batch A | Batches A + B | Delta |
+| --- | ---: | ---: | ---: |
+| recall_at_3 | 0.909091 | 0.888889 | -0.020202 |
+| recall_at_5 | 0.954545 | 0.962963 | +0.00841751 |
+| mrr | 0.819697 | 0.825309 | +0.00561167 |
+| ndcg_at_5 | 0.85362 | 0.859641 | +0.00602134 |
+| correctness | 0.655172 | 0.691176 | +0.0360041 |
+| abstention_correctness | 0.714286 | 0.857143 | +0.142857 |
+| faithfulness | 1 | 1 | +0 |
+| p95_total_ms | 72739.4 | 33446.5 | -39292.9 |
+
+The full before/after comparison includes the extra Batch B questions. The recorder loan answer hint changes with the active document version. The new distribution and the enlarged test split both affect the aggregate deltas.
+
+[Full before/after comparison](../eval/results/comparison_batch_ab.md) · [Batch B evaluation](../eval/results/eval_20261123T204647590405Z_batch_ab.json) · [Batch B per-question evidence](../eval/results/eval_20261123T204647590405Z_batch_ab_details.jsonl)
+
 ## F. Kubernetes
 
 The fresh `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. Fixture ingestion ran in the Kubernetes Job. Live and candidate Deployments reached readiness, the API rejected a write attempt, and the fixture chunk survived a Chroma pod restart. The Kubernetes workloads called the pinned local Ollama through a temporary relay while the in-cluster Ollama image pull was stalled. [Ingest Job](../eval/results/k8s_fixture_ingest.json), [API write rejection](../eval/results/k8s_api_readonly.txt), [persistence](../eval/results/k8s_chroma_persistence.txt)
@@ -116,11 +137,16 @@ The fresh `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. F
 | --- | ---: | ---: | --- |
 | Live API | 286m | 270 MiB | 300m CPU, 320 MiB |
 | Candidate API | 274m | 264 MiB | 300m CPU, 320 MiB |
-| Chroma | 178m | 466 MiB | 200m CPU, 512 MiB |
+| Chroma | 178m | 538 MiB sampled before full indexing | 200m CPU, 1024 MiB |
 | Eval Job | 0m | 25 MiB | 200m CPU, 128 MiB |
-| Unseen ingestion Job | — | 79.46 MiB peak RSS | 250m CPU, 192 MiB |
+| Unseen ingestion Job | — | 79.46 MiB peak RSS | 1500m CPU, 1280 MiB shared ingestion profile |
+| Full ingestion Job | 1324m | 1085.70 MiB peak RSS | 1500m CPU, 1280 MiB |
 
-The CPU and memory samples came from different stages of the fixture run. The Eval Job sample was taken while waiting on its dependency. Its configured request allows headroom for active work. Full-corpus resource sizing still requires a sustained cluster run. [Service sample](../eval/results/resources_minikube_fixture.txt), [Eval Job sample](../eval/results/resources_minikube_eval_job.txt)
+The CPU and memory samples came from different stages of the fixture run. The Eval Job sample was taken while waiting on its dependency. Its configured request allows headroom for active work. The full ingestion sample informed the shared ingestion request. [Service sample](../eval/results/resources_minikube_fixture.txt), [Eval Job sample](../eval/results/resources_minikube_eval_job.txt)
+
+The first full-corpus Kubernetes ingestion verified the source data and wrote a partial index before Chroma exceeded its original 1 GiB memory limit. The Job's write failed when its Service temporarily disappeared. Chroma's limit was raised to 2 GiB on the isolated node, and the next Job resumed reconciliation from the existing lake and persisted chunk IDs. [Timed ingest output](../eval/results/resources_minikube_full_ingest.txt), [resource sample](../eval/results/resources_minikube_full_ingest_sample.txt), [OOM termination](../eval/results/k8s_full_chroma_oom.json)
+
+The resumed Job kept 432 persisted chunks, embedded the remaining 292, and passed its orphan check. The collection held 724 chunks. [Kubernetes verification](../eval/results/k8s_full_corpus_verification.json), [resume Job](../eval/results/k8s_full_corpus_resume.txt), [final collection](../eval/results/k8s_full_corpus_collection.json)
 
 The Kubernetes smoke baseline finished. The first candidate Job received an HTTP 502 during evaluation, so it exited before the gate. [Smoke baseline](../eval/results/k8s_smoke_baseline.json), [per-question output](../eval/results/k8s_smoke_baseline_details.jsonl), [initial Job failure](../eval/results/k8s_smoke_first_failure.txt)
 
