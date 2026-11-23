@@ -21,3 +21,17 @@ Discovery commit: `ca354c4`. The running Ollama container has Qwen 2.5 3B and no
 | Flagged instruction-like text as informational. | The assignment requires the poisoned document to reach retrieval so the retrieval rail can demonstrate its action. |
 | Wrote revision bytes before atomically replacing the manifest. | A crash between these steps leaves raw files available to retry. The manifest records which revision is active and preserves previous bytes for restore. Physical current-directory materialization and index synchronization are still pending. |
 | Added verification, duplicate, injection and archive/restore tests. | `python -m pytest tests -q` passed four unit tests. `python -m ruff check ragops tests` passed. The tests use fixed test vectors to isolate the lifecycle and do not produce evaluation evidence. |
+| Staged the pinned Assignment 02 originals and added a fictional loan policy to Batch A. | The original corpus exercises extraction. The authored policy gives Batch B a controlled fact change. |
+| Added a Chroma reconciliation pass after lake admission. | Exact metadata and ID comparisons detect stale or orphaned chunks. Unchanged chunk hashes avoid embedding work. A fixture rerun embedded zero chunks. |
+| Corrected Chroma revision publication after a real run. | The thin client rejects distance metadata in updates. Distance belongs in the creation configuration. |
+
+## Phases 2–6 — Query evidence and offline release checks
+
+| Decision or change | Reason and verification |
+| --- | --- |
+| Reused the grounded Ollama provider for the RAGOps endpoint. | The trace records both inference calls after the seed is populated. One hash covers both requests. |
+| Dropped instruction-like chunks before generation. | Verification flags suspicious text without quarantining it. The trace identifies the dropped chunk and pattern. |
+| Used an exact, revision-scoped query cache and bypassed it during evaluation. | Cache hits reuse the original request hashes. Both runs exercise the retrieval and generation stages. |
+| Used a quote-overlap faithfulness proxy. | The existing generator produces a source-paired excerpt, so the evaluator can compare it against the actual context. |
+| Labeled generated golden questions as pending manual review. | The team can complete human authoring and review using the checklist. The expanded set includes off-topic abstentions. |
+| Set the candidate chunk-size limit as the only planned pipeline change. | Both collections can run on one corpus split with the same generator and seed. |
