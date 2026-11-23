@@ -46,7 +46,13 @@ The three-level evaluation, noise, seeded differences and candidate decision req
 
 ## D. Observability
 
-The trace saves retrieved text, ranking, rail actions, filtered generation context and the complete Ollama request bodies. Trace `749f8d0a2517460abd1b713da4956327` retrieved the locker policy first and then dropped it for an instruction-pattern match. The remaining chunks fell below the relevance floor. Generation had no context, so the pipeline abstained. [Fixture trace](../traces/batch-b-fixture.jsonl)
+The trace saves retrieved text, ranking, rail actions, filtered generation context and the complete Ollama request bodies.
+
+1. Trace `749f8d0a2517460abd1b713da4956327` asks where the recorder return locker is.
+2. The top retrieval is the locker policy in the Batch B fixture.
+3. The retrieval rail drops that chunk for an instruction-pattern match.
+4. The other retrieved chunks fall below the relevance floor, leaving an empty generation context.
+5. The trace records an abstention and no model requests. [Fixture trace](../traces/batch-b-fixture.jsonl)
 
 ## E. Coverage and distribution change
 
@@ -56,7 +62,15 @@ At the calibrated cutoff of 0.540988, coverage was 65% before expansion and 100%
 
 ## F. Kubernetes
 
-The fresh `ragops-dev` Minikube profile was created and the `ragops` namespace bound the data, model and Chroma PVCs. Workload resource sizing and release/rollback evidence still require a completed cluster run.
+The fresh `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. Fixture ingestion ran in the Kubernetes Job. Live and candidate Deployments reached readiness, the API rejected a write attempt, and the fixture chunk survived a Chroma pod restart. The Kubernetes workloads called the pinned local Ollama through a temporary relay while the in-cluster Ollama image pull was stalled. [Ingest Job](../eval/results/k8s_fixture_ingest.json), [API write rejection](../eval/results/k8s_api_readonly.txt), [persistence](../eval/results/k8s_chroma_persistence.txt)
+
+| Workload | Observed CPU | Observed memory | Resource request based on the fixture sample |
+| --- | ---: | ---: | --- |
+| Live API | 286m | 77 MiB | 300m CPU, 128 MiB |
+| Candidate API | 274m | 77 MiB | 300m CPU, 128 MiB |
+| Chroma | 178m | 87 MiB | 200m CPU, 128 MiB |
+
+This is a fixture-scale sample. Full ingestion and evaluation Job resource sizing and the production release decision still require workload measurements. [Minikube resource output](../eval/results/resources_minikube_fixture.txt)
 
 ## Short answers
 

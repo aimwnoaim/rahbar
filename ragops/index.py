@@ -47,7 +47,7 @@ def rows(collection: Any, include: list[str]) -> Iterator[dict[str, Any]]:
 
 
 def synchronize(
-    collection: Any, lake: Lake, embed: Embed, size: int, overlap: int
+    collection: Any, lake: Lake, embed: Embed, size: int, overlap: int, *, reuse: Any = None,
 ) -> dict[str, Any]:
     expected = {item.id: item for item in chunks(lake, size, overlap)}
     indexed = {row["id"]: row for row in rows(collection, ["metadatas"])}
@@ -56,7 +56,11 @@ def synchronize(
         if item.id not in indexed or item.metadata != indexed[item.id]["metadatas"]
     ]
     deleted = sorted(indexed.keys() - expected.keys())
+    reusable = {
+        row["metadatas"]["chunk_hash"]: row["id"] for row in rows(reuse, ["metadatas"])
+    } if reuse is not None else {}
     embedded = 0
+    reused = 0
     for start in range(0, len(upserts), 16):
         batch = upserts[start:start + 16]
         existing_ids = [
@@ -69,6 +73,19 @@ def synchronize(
             chunk_id: vector.tolist() if hasattr(vector, "tolist") else vector
             for chunk_id, vector in zip(existing["ids"], existing["embeddings"], strict=True)
         } if existing is not None else {}
+        shared = {
+            item.id: reusable[item.metadata["chunk_hash"]]
+            for item in batch if item.id not in vectors and item.metadata["chunk_hash"] in reusable
+        }
+        if shared:
+            prior = reuse.get(ids=sorted(set(shared.values())), include=["embeddings"])
+            shared_vectors = {
+                chunk_id: vector.tolist() if hasattr(vector, "tolist") else vector
+                for chunk_id, vector in zip(prior["ids"], prior["embeddings"], strict=True)
+            }
+            for chunk_id, prior_id in shared.items():
+                vectors[chunk_id] = shared_vectors[prior_id]
+            reused += len(shared)
         missing = [item for item in batch if item.id not in vectors]
         if missing:
             vectors.update(zip(
@@ -92,7 +109,7 @@ def synchronize(
     )
     return {
         "chunks_embedded": embedded, "chunks_deleted": len(deleted),
-        "chunks_kept": len(expected) - embedded,
+        "chunks_kept": len(expected) - embedded - reused, "chunks_reused": reused,
         "orphan_check": "pass",
         "inactive_doc_chunk_counts": dict.fromkeys(inactive, 0),
     }

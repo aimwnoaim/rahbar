@@ -16,7 +16,7 @@ The two collections differ in the maximum chunk size. The gate compares recall, 
 
 ## D. Tracing and monitoring
 
-The trace records all retrieved chunks, deterministic reranking, discarded chunks, and the exact requests sent to Ollama. The reconstruction command checks the request hash. Cache hits cite the original context and prompt. The metrics view summarizes trace observations over a time window.
+The trace records all retrieved chunks, deterministic reranking, discarded chunks, and the exact request sent to Ollama. The model chooses a numbered excerpt. Python formats that excerpt and its real citation into the answer. The reconstruction command checks the request hash. Cache hits retain the original context and prompt. The metrics view summarizes trace observations over a time window.
 
 ## E. Coverage and drift
 

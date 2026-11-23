@@ -43,3 +43,7 @@ def test_index_reconciles_update_delete_and_restore(tmp_path):
     lake.restore("loans", "1")
     assert synchronize(collection, lake, embed, 400, 50)["orphan_check"] == "pass"
     assert "three" in next(iter(collection.rows.values()))["documents"]
+    fork = Collection()
+    counts = synchronize(fork, lake, embed, 600, 50, reuse=collection)
+    assert counts["chunks_embedded"] == 0
+    assert counts["chunks_reused"] == 1

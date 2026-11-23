@@ -30,13 +30,14 @@ spec:
       automountServiceAccountToken: false
       containers:
       - name: chroma
-        image: chromadb/chroma:1.0.12
+        image: docker.io/chromadb/chroma:1.0.12
+        imagePullPolicy: Never
         ports:
         - containerPort: 8000
         resources:
           requests:
-            cpu: 150m
-            memory: 256Mi
+            cpu: 200m
+            memory: 128Mi
           limits:
             cpu: '1'
             memory: 1Gi

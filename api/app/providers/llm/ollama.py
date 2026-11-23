@@ -10,7 +10,7 @@ from copy import deepcopy
 import httpx
 
 from ...config import Settings
-from ...schemas import Answer, Passage
+from ...schemas import Answer, Citation, Passage
 from ...retrieval.references import _terms
 
 
@@ -29,6 +29,23 @@ class OllamaProvider:
             self.record_request(payload)
         return httpx.post(
             f"{self.settings.ollama_url.rstrip('/')}/api/chat", json=payload, timeout=180.0,
+        )
+
+    def generate_extractive(self, question: str, passages: list[Passage]) -> Answer:
+        """Decode the evidence choice once, then construct the cited answer in Python."""
+        selected = self._select_excerpt(question, passages, quote_limit=2)
+        if selected is None:
+            return Answer(
+                reasoning="No retrieved excerpt established the requested fact.",
+                answer="The available documents do not establish an answer to this question.",
+                citations=[], answered_from_context=False, confidence="low",
+            )
+        passage, quote = selected
+        return Answer(
+            reasoning="Selected a retrieved evidence excerpt.",
+            answer=f'The cited policy states: "{quote}"',
+            citations=[Citation(source=passage.source, section=passage.section, page=passage.page)],
+            answered_from_context=True, confidence="medium",
         )
 
     def generate(self, question: str, passages: list[Passage]) -> Answer:
@@ -86,8 +103,12 @@ class OllamaProvider:
                 raise ValueError("answer does not match the cited evidence excerpt")
         return answer
 
-    def _select_excerpt(self, question: str, passages: list[Passage]) -> tuple[Passage, str] | None:
-        options = [(p, quote) for p in passages for quote in _quote_options(p.text, question)]
+    def _select_excerpt(
+        self, question: str, passages: list[Passage], quote_limit: int = 4,
+    ) -> tuple[Passage, str] | None:
+        options = [
+            (p, quote) for p in passages for quote in _quote_options(p.text, question)[:quote_limit]
+        ]
         if not options:
             return None
         response = self._chat({

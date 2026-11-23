@@ -6,7 +6,9 @@ Run these commands in Bash from the repository root. The separate profile keeps 
 minikube start -p ragops-dev --driver=docker --container-runtime=containerd --cpus=6 --memory=6144 --keep-context
 minikube addons enable metrics-server -p ragops-dev
 docker build --build-arg GIT_COMMIT="$(git rev-parse HEAD)" -t rahbar-ragops:dev .
+docker pull chromadb/chroma:1.0.12
 minikube image load -p ragops-dev rahbar-ragops:dev
+minikube image load -p ragops-dev chromadb/chroma:1.0.12
 k=(kubectl --context ragops-dev -n ragops)
 "${k[@]}" apply -f k8s/namespace.yaml
 "${k[@]}" apply -f k8s/config.yaml -f k8s/pvc.yaml -f k8s/chroma.yaml -f k8s/ollama.yaml -f k8s/inbox-loader.yaml
@@ -19,6 +21,8 @@ k=(kubectl --context ragops-dev -n ragops)
 ```
 
 Compare the embedding model ID with `EMBEDDING_VERSION` in `ragops-config` before recording evidence. Use the existing corpus download workflow, then stage Batch A. Only the ingest job and its CronJob variants invoke lake and vector writes. API pods use a read-only code path, with an explicit flag rejecting CLI writes.
+
+If a node cannot pull Ollama, set `OLLAMA_URL` in `ragops-config` to a reachable, already-running local Ollama service with the same models. Restart live and candidate workloads if they already use the old environment. New Jobs read the updated configuration when their pods start.
 
 ```bash
 python scripts/stage_ragops_batch_a.py --out work/ragops/k8s-batch-a

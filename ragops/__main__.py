@@ -40,7 +40,8 @@ def main() -> int:
     restore = commands.add_parser("restore")
     restore.add_argument("doc_id")
     restore.add_argument("version")
-    commands.add_parser("sync")
+    sync = commands.add_parser("sync")
+    sync.add_argument("--reuse-from")
     trace = commands.add_parser("trace")
     trace.add_argument("trace_id")
     metrics = commands.add_parser("metrics")
@@ -111,20 +112,35 @@ def update_lake(args: argparse.Namespace, parser: argparse.ArgumentParser, lake:
     if args.command == "restore":
         lake.restore(args.doc_id, args.version)
     lake.materialize_current()
-    collection = get_client(settings).get_or_create_collection(
+    version = os.getenv("EMBEDDING_VERSION", "unrecorded")
+    client = get_client(settings)
+    collection = client.get_or_create_collection(
         settings.collection, metadata={
             "embed_model": settings.embed_model,
-            "embedding_version": os.getenv("EMBEDDING_VERSION", "unrecorded"),
+            "embedding_version": version,
         },
         configuration={"hnsw": {"space": "cosine"}},
     )
     if collection.metadata.get("embed_model") != settings.embed_model:
         raise ValueError("collection embedding model differs from configuration")
+    stored_version = collection.metadata.get("embedding_version", "unrecorded")
+    if version != "unrecorded" and stored_version not in {version, "unrecorded"}:
+        raise ValueError("collection embedding version differs from configuration")
+    reuse = None
+    if args.command == "sync" and args.reuse_from:
+        reuse = client.get_collection(args.reuse_from)
+        if version == "unrecorded" or (
+            reuse.metadata.get("embed_model"), reuse.metadata.get("embedding_version")
+        ) != (settings.embed_model, version):
+            raise ValueError("shared embeddings require an identical recorded model and version")
     counts.update(synchronize(
-        collection, lake, embed_text, settings.chunk_size, settings.chunk_overlap,
+        collection, lake, embed_text, settings.chunk_size, settings.chunk_overlap, reuse=reuse,
     ))
     metadata = {key: value for key, value in collection.metadata.items() if key != "hnsw:space"}
-    collection.modify(metadata=metadata | {"lake_revision": lake.manifest["revision"]})
+    verified_version = stored_version if version == "unrecorded" else version
+    collection.modify(metadata=metadata | {
+        "lake_revision": lake.manifest["revision"], "embedding_version": verified_version,
+    })
     if args.command == "ingest":
         write_json(args.out / f"incremental_{run_id}.json", counts)
     print(json.dumps(counts, indent=2))

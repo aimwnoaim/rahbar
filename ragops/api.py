@@ -34,7 +34,10 @@ def query(
     retrieval_only: bool = False,
 ) -> dict[str, Any]:
     started = perf_counter()
-    settings_api = replace(api_config.get_settings(), temperature=0.0, ollama_url=settings.ollama_url)
+    settings_api = replace(
+        api_config.get_settings(), temperature=0.0,
+        ollama_url=os.getenv("LLM_OLLAMA_URL", settings.ollama_url),
+    )
     version = os.environ["EMBEDDING_VERSION"]
     top_k = settings_api.top_k
     filters = {"$and": [{"status": "active"}, {"access": "public"}]}
@@ -92,7 +95,7 @@ def query(
             passages = [Passage.model_validate(row) for row in context]
             for _ in range(2):
                 try:
-                    answer = provider.generate(question, passages)
+                    answer = provider.generate_extractive(question, passages)
                 except (ValueError, KeyError, TypeError) as error:
                     generation_errors.append(type(error).__name__)
                 else:
