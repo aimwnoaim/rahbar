@@ -44,7 +44,7 @@ With the fixture inbox changed to remove the locker policy, reconciliation delet
 
 ## B and C. Evaluation and release
 
-The full Batch A retrieval-only suite completed both seeded passes and the typo test. It measures the embedding and retrieval layers. Full-corpus end-to-end scores are pending.
+The full Batch A retrieval-only suite completed both seeded passes and the typo test. It measures the embedding and retrieval layers. The full Batch A end-to-end evaluation also completed.
 
 | Baseline module or retrieval metric | Mean | Absolute difference | Typo delta |
 | --- | ---: | ---: | ---: |
@@ -63,9 +63,26 @@ The full Batch A retrieval-only suite completed both seeded passes and the typo 
 
 [Batch A retrieval-only scores](../eval/results/retrieval_eval_20261123T201146183667Z_batch_a.json) · [Per-question retrieval output](../eval/results/retrieval_eval_20261123T201146183667Z_batch_a_details.jsonl)
 
+| Full Batch A end-to-end metric | Mean | Absolute difference |
+| --- | ---: | ---: |
+| correctness | 0.655172 | 0.0689655 |
+| faithfulness | 1 | 0 |
+| hallucination_rate | 0 | 0 |
+| citation_validity | 1 | 0 |
+| abstention_correctness | 0.714286 | 0.285714 |
+| false_abstention_rate | 0.0454545 | 0 |
+| p50_total_ms | 20273.9 | 36677.7 |
+| p95_total_ms | 72739.4 | 75767.2 |
+
+[Full Batch A results](../eval/results/eval_20261123T200917344381Z_batch_a.json) · [Per-question generation output](../eval/results/eval_20261123T200917344381Z_batch_a_details.jsonl)
+
+Across the two seeded passes, three questions changed answers while their retrieved order and prompt hashes stayed the same. The observed answer differences arose after retrieval. API response caching was bypassed for both passes. [Repeat diagnostics](../eval/results/baseline_seed_repeat_diagnostics.json)
+
 The 600-word candidate reused 633 vectors from byte-identical baseline chunks, kept 64 previously indexed vectors and embedded 18 remaining chunks. [Candidate reconciliation](../eval/results/candidate_sync.json)
 
 The 600-word candidate is rejected on the measured retrieval requirement. Recall@5 fell from 95.45% to 90.91%, a 4.55 percentage-point drop. The gate recorded the failed recall rule and withheld release because full end-to-end values were also pending. [Candidate comparison](../eval/results/comparison_retrieval_candidate.md), [gate output](../eval/results/gate_retrieval_candidate.txt)
+
+The full baseline and 600-word candidate were also compared across all three levels. [Full candidate comparison](../eval/results/comparison_candidate.md), [full candidate gate](../eval/results/gate_candidate.txt)
 
 ## D. Observability
 
@@ -75,11 +92,13 @@ A full-corpus query about lecture credit hours reconstructed both model requests
 
 On the updated full corpus, a fresh query cited the five-working-day policy. The exact repeat returned the same source-backed response from the cache. [Batch B trace and cache hit](../traces/batch-b-version-and-cache.jsonl)
 
-1. Trace `749f8d0a2517460abd1b713da4956327` asks where the recorder return locker is.
-2. The top retrieval is the locker policy in the Batch B fixture.
-3. The retrieval rail drops that chunk for an instruction-pattern match.
-4. The other retrieved chunks fall below the relevance floor, leaving an empty generation context.
-5. The trace records an abstention and no model requests. [Fixture trace](../traces/batch-b-fixture.jsonl)
+The locker trace retrieved the poisoned policy first. The retrieval rail dropped it for an instruction-pattern match. The remaining chunks fell below the relevance floor, leaving no model context. [Fixture trace](../traces/batch-b-fixture.jsonl)
+
+1. Full-baseline trace `bbdf25092fd14a27b76dc5e207f675b2` asks about loan criteria and types.
+2. The highest-ranked chunk came from the entrepreneurship policy at cosine 0.599934.
+3. Student Handbook loan passages were retrieved at lower scores.
+4. Every hit fell below the configured 0.60 relevance floor, leaving empty context.
+5. No guardrail fired and no model request ran. The pipeline abstained at the relevance filter. [Full-baseline abstention trace](../traces/full-baseline-abstention.jsonl)
 
 ## E. Coverage and distribution change
 
@@ -98,11 +117,25 @@ The fresh `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. F
 | Live API | 286m | 270 MiB | 300m CPU, 320 MiB |
 | Candidate API | 274m | 264 MiB | 300m CPU, 320 MiB |
 | Chroma | 178m | 466 MiB | 200m CPU, 512 MiB |
-| Eval Job | 0m | 25 MiB | 200m CPU, 192 MiB |
+| Eval Job | 0m | 25 MiB | 200m CPU, 128 MiB |
+| Unseen ingestion Job | — | 79.46 MiB peak RSS | 250m CPU, 192 MiB |
 
 The CPU and memory samples came from different stages of the fixture run. The Eval Job sample was taken while waiting on its dependency. Its configured request allows headroom for active work. Full-corpus resource sizing still requires a sustained cluster run. [Service sample](../eval/results/resources_minikube_fixture.txt), [Eval Job sample](../eval/results/resources_minikube_eval_job.txt)
 
 The Kubernetes smoke baseline finished. The first candidate Job received an HTTP 502 during evaluation, so it exited before the gate. [Smoke baseline](../eval/results/k8s_smoke_baseline.json), [per-question output](../eval/results/k8s_smoke_baseline_details.jsonl), [initial Job failure](../eval/results/k8s_smoke_first_failure.txt)
+
+The optimized candidate Job completed the two-question fixture evaluation using in-cluster Ollama. All gate rules passed. A ConfigMap-only change forced the latency rule to fail on the same recorded result, and restoring the original ConfigMap let the Job pass again without rebuilding the image. This was a Kubernetes smoke release with the authored fixture. [Candidate evaluation](../eval/results/k8s_smoke_candidate.json), [per-question output](../eval/results/k8s_smoke_candidate_details.jsonl), [gate pass](../eval/results/k8s_smoke_gate_pass.txt), [strict gate fail](../eval/results/k8s_smoke_gate_fail.txt), [restored gate pass](../eval/results/k8s_smoke_gate_restored.txt), [model parity](../eval/results/k8s_model_embedding_parity.json)
+
+| Fixture deployment step | Collection | Embedding version | Top-k |
+| --- | --- | --- | ---: |
+| Before release | `rahbar_kube_v1_nomic` | `8688dbc0926c` | 5 |
+| Passing fixture release | `rahbar_kube_v2_nomic` | `8688dbc0926c` | 5 |
+| Controlled regression | `rahbar_kube_v1_nomic` | `8688dbc0926c` | 1 |
+| After undo | `rahbar_kube_v2_nomic` | `8688dbc0926c` | 5 |
+
+[Rollout and undo](../eval/results/k8s_fixture_rollouts.txt) · [Service traces](../traces/k8s-fixture-rollouts.jsonl)
+
+After undo, the unseen-batch Job verified and indexed the poster-printer policy. A live query retrieved the new document. [Unseen ingestion Job and peak memory](../eval/results/resources_minikube_unseen_ingest.txt) · [Verification](../eval/results/k8s_unseen_verification.json) · [Unseen document trace](../traces/k8s-unseen-batch.jsonl) · [Trace on Kubernetes stdout](../traces/k8s-stdout-after-undo.jsonl)
 
 ## Short answers
 

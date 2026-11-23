@@ -24,6 +24,17 @@ Compare the embedding model ID with `EMBEDDING_VERSION` in `ragops-config` befor
 
 If a node cannot pull Ollama, set `OLLAMA_URL` in `ragops-config` to a reachable, already-running local Ollama service with the same models. Restart live and candidate workloads if they already use the old environment. New Jobs read the updated configuration when their pods start.
 
+If kubelet continues to report `ErrImageNeverPull` for the public Chroma image after reloading it, the demo cluster recovered with a separately built local image based on the same Chroma version. [Kubernetes pre-pulled image behavior](https://kubernetes.io/docs/concepts/containers/images/#pre-pulled-images)
+
+```bash
+printf '%s\n' 'FROM chromadb/chroma:1.0.12' 'LABEL org.opencontainers.image.title="RAHBAR Chroma local demo"' |
+  docker build -t rahbar-chroma-demo:1.0.12 -
+minikube image load -p ragops-dev rahbar-chroma-demo:1.0.12
+"${k[@]}" set image statefulset/chroma chroma=rahbar-chroma-demo:1.0.12
+"${k[@]}" delete pod chroma-0
+"${k[@]}" wait --for=condition=ready pod/chroma-0 --timeout=180s
+```
+
 ```bash
 python scripts/stage_ragops_batch_a.py --out work/ragops/k8s-batch-a
 loader=$("${k[@]}" get pod -l app.kubernetes.io/name=inbox-loader -o jsonpath='{.items[0].metadata.name}')
@@ -86,4 +97,4 @@ curl -fsS -X POST http://127.0.0.1:8000/query -H 'Content-Type: application/json
 "${k[@]}" top pods
 ```
 
-Check retrieval again after the restart. Record actual API, Chroma and job resource usage in `eval/results/resources_*.txt` before setting the final requests and limits. The manifest values are initial limits pending workload measurements.
+Check retrieval again after the restart. Record actual API, Chroma and Job resource usage in `eval/results/resources_*.txt`. The tracked requests include headroom above the measured fixture workload. Measure a sustained workload with the full corpus before generalizing the sizing.
