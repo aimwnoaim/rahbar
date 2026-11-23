@@ -35,3 +35,13 @@ Discovery commit: `ca354c4`. The running Ollama container has Qwen 2.5 3B and no
 | Used a quote-overlap faithfulness proxy. | The existing generator produces a source-paired excerpt, so the evaluator can compare it against the actual context. |
 | Labeled generated golden questions as pending manual review. | The team can complete human authoring and review using the checklist. The expanded set includes off-topic abstentions. |
 | Set the candidate chunk-size limit as the only planned pipeline change. | Both collections can run on one corpus split with the same generator and seed. |
+| Added eight questions supplied by the project owner. | Kept the author's wording and separately checked the evidence labels. The fee and credit-limit questions lack enough detail for a specific answer. Team review of generated rows is still open. |
+| Calibrated coverage against the midpoint of the paraphrase and unrelated score means. | The exploratory cutoff rejected both sets. At the calibrated cutoff, the original golden set failed the 85% coverage rule and the expanded set passed it. The expanded set deliberately samples topics from the live set, so its score is demonstration coverage rather than an independent estimate. |
+
+## Phase 7 — Branch and Kubernetes checks
+
+| Decision or change | Reason and verification |
+| --- | --- |
+| Pushed `codex/dev-ragops` and ran CI on that branch. | The quality job passed on the first pushed commit. The cluster smoke job started after quality. |
+| Created a separate Minikube profile and applied namespace, storage and dependency manifests. | The profile started clean and bound the claims. Cached models and images can be reused locally to reduce registry traffic. |
+| Use a shared RWO data PVC on a single node for the assignment demo. | The read-only API uses it for trace append, while ingestion and evaluation Jobs use it for their outputs. Initial resource limits require measurement under load. |

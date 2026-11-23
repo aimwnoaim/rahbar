@@ -15,7 +15,7 @@ from .lake import Lake, atomic_write, write_json
 from .verify import Embed, Source
 
 
-def load_source(root: Path, entry: dict[str, Any]) -> tuple[Source, bytes, str]:
+def load_source(root: Path, entry: dict[str, Any], lake: Lake) -> tuple[Source, bytes, str]:
     path = root / entry["file"]
     if path.resolve().parent != root.resolve():
         raise ValueError(f"source file must be directly inside {root}")
@@ -23,14 +23,19 @@ def load_source(root: Path, entry: dict[str, Any]) -> tuple[Source, bytes, str]:
     error = None
     pages: tuple[str, ...] = ()
     version = str(entry.get("version", ""))
-    try:
-        document = extract(str(path), version, False)
-        pages = tuple(page.text for page in document.pages)
-    except Exception as failure:
-        error = f"{type(failure).__name__}: {failure}"
+    raw_hash = hashlib.sha256(raw).hexdigest()
+    prior = lake.manifest["versions"].get(entry.get("doc_id"), {}).get(version)
+    if prior and prior["raw_hash"] == raw_hash:
+        pages = tuple(prior["document"]["pages"])
+    else:
+        try:
+            document = extract(str(path), version, False)
+            pages = tuple(page.text for page in document.pages)
+        except Exception as failure:
+            error = f"{type(failure).__name__}: {failure}"
     truncated = path.suffix.lower() == ".pdf" and b"%%EOF" not in raw[-1024:]
     checksum = entry.get("sha256")
-    if checksum and hashlib.sha256(raw).hexdigest() != checksum:
+    if checksum and raw_hash != checksum:
         error = "raw bytes differ from the source manifest checksum"
     return (
         Source(
@@ -52,7 +57,9 @@ def ingest(
     reports = []
     present = set()
     for entry in entries:
-        document, raw, suffix = load_source(inbox, entry)
+        if snapshot and not (inbox / entry["file"]).is_file():
+            continue
+        document, raw, suffix = load_source(inbox, entry, lake)
         result, action = lake.admit(document, raw, suffix, run_id, embed, near_threshold, min_length)
         present.add(document.doc_id)
         counts["seen"] += 1

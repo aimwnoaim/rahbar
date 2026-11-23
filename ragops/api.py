@@ -13,7 +13,6 @@ from uuid import uuid4
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from pydantic import ValidationError
 
 from api.app import config as api_config
 from api.app.providers.llm.ollama import OllamaProvider
@@ -80,21 +79,28 @@ def query(question: str, collection: Any, settings: Any, *, bypass_cache: bool =
         phases["rail"] = (perf_counter() - start) * 1000
         requests: list[dict[str, Any]] = []
         start = perf_counter()
+        generation_errors = []
+        response = {
+            "answer": "The available documents do not establish an answer to this question.",
+            "answered_from_context": False, "confidence": "low", "citations": [],
+        }
         if context:
             provider = OllamaProvider(settings_api, record_request=requests.append)
             passages = [Passage.model_validate(row) for row in context]
-            answer = provider.generate(question, passages)
-            response = answer.model_dump(exclude={"reasoning"})
-        else:
-            response = {
-                "answer": "The available documents do not establish an answer to this question.",
-                "answered_from_context": False, "confidence": "low", "citations": [],
-            }
+            for _ in range(2):
+                try:
+                    answer = provider.generate(question, passages)
+                except (ValueError, KeyError, TypeError) as error:
+                    generation_errors.append(type(error).__name__)
+                else:
+                    response = answer.model_dump(exclude={"reasoning"})
+                    break
         phases["generate"] = (perf_counter() - start) * 1000
         computed = {
             "retrieved": retrieved, "context": context, "guardrail_actions": actions,
             "response": response, "model_requests": requests, "prompt_hash": prompt_hash(requests),
             "reranked_order": [row["chunk_id"] for row in retrieved],
+            "generation_errors": generation_errors,
         }
         if response["answered_from_context"] and not bypass_cache and revision != "unpublished":
             with _CACHE_LOCK:
@@ -147,7 +153,7 @@ def ask(payload: AskRequest, bypass_cache: bool = False) -> dict[str, Any]:
     settings = get_settings()
     try:
         return query(payload.question, get_collection(settings), settings, bypass_cache=bypass_cache)
-    except (httpx.HTTPError, ValueError, ValidationError) as error:
+    except (httpx.HTTPError, ValueError) as error:
         raise HTTPException(status_code=502, detail="pipeline could not complete the query") from error
 
 

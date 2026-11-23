@@ -7,19 +7,8 @@ The JSONL files label generated questions as synthetic and pending human review.
 3. Verify the split. Questions about new Batch B content stay out of the Batch A run. The recorder loan duration uses its version-specific hint.
 4. For at least eight synthetic rows, mark `reviewed: true`, set `review_status: human_reviewed` and record who reviewed the label in `notes`.
 
-## Human-written question slots
+## Human-written questions
 
-Have the team write the wording independently. Add new rows with distinct IDs and use `source: human` only when a member wrote the question.
-
-| ID slot | Evidence area | Author and question |
-| --- | --- | --- |
-| human-01 | Attendance policy | Pending |
-| human-02 | Academic warning | Pending |
-| human-03 | Credit hours | Pending |
-| human-04 | Summer repeats | Pending |
-| human-05 | Fee-page row | Pending |
-| human-06 | Grading table | Pending |
-| human-07 | Recorder loan | Pending |
-| human-08 | Accessible seating | Pending |
+Rows `human-01` through `human-08` preserve the project owner's question wording. Codex checked the source labels. The credit-limit and total-degree-fee questions are abstention cases because the request lacks necessary program details. The accessibility question uses the exam-seating fixture in the Batch B split. Team review of the synthetic rows remains open.
 
 Faithfulness uses a cited-excerpt overlap proxy, so LLM judge agreement is outside this evaluator.

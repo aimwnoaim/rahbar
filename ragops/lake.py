@@ -65,6 +65,20 @@ class Lake:
         })
         write_json(self.manifest_path, self.manifest)
 
+    def materialize_current(self) -> None:
+        """Project active bytes from the authoritative revision manifest."""
+        directory = self.root / "lake" / "current"
+        expected = set()
+        for doc_id, version in self.manifest["active"].items():
+            archive = self.root / self.manifest["versions"][doc_id][version]["raw_path"]
+            destination = directory / doc_id / version / archive.name
+            expected.add(destination)
+            if not destination.is_file():
+                atomic_write(destination, archive.read_bytes())
+        for existing in directory.glob("*/*/source.*"):
+            if existing not in expected:
+                existing.unlink()
+
     def admit(
         self,
         document: Source,
@@ -93,15 +107,14 @@ class Lake:
         stored = versions.get(version)
         if stored and stored["raw_hash"] != raw_hash:
             raise ValueError(f"revision {doc_id}/{version} already exists with different source bytes")
-        if previous == version and stored and stored["document"] == asdict(document) | {
-            "pages": list(document.pages)
-        }:
+        serialized = asdict(document) | {"pages": list(document.pages)}
+        if previous == version and stored and stored["document"] == serialized:
             return result, "unchanged"
 
         relative = Path("lake", "archive", doc_id, version)
         atomic_write(self.root / relative / ("source" + suffix), raw)
         stored = {
-            "document": asdict(document) | {"pages": list(document.pages)},
+            "document": serialized,
             "fingerprint": asdict(result.fingerprint),
             "raw_hash": raw_hash,
             "raw_path": (relative / ("source" + suffix)).as_posix(),

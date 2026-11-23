@@ -99,6 +99,7 @@ def main() -> int:
         counts = result["counts"]
     if args.command == "restore":
         lake.restore(args.doc_id, args.version)
+    lake.materialize_current()
     if args.command != "verify":
         if not 0 <= settings.chunk_overlap < settings.chunk_size:
             parser.error("chunk overlap must be nonnegative and smaller than chunk size")
