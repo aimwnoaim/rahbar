@@ -78,6 +78,7 @@
 // The API sits behind the same Ingress host at /api. For local development you can
 // point elsewhere with ?api=http://localhost:8000 (that server must allow CORS).
 const API_BASE = new URLSearchParams(location.search).get("api") || window.RAHBAR_API || "";
+const API_ENDPOINT = new URLSearchParams(location.search).get("endpoint") || "/api/ask";
 
 const thread = document.getElementById("thread");
 const form = document.getElementById("ask");
@@ -113,25 +114,29 @@ function cite(c) {
 }
 
 function renderAnswer(data, cacheHeader) {
+  // The legacy API returns the answer at the top level. RAGOps returns a trace
+  // containing the answer under `response` plus the retrieved passages.
+  const answer = data.response ?? data;
   const card = el("article", { class: "a" });
 
   const chips = el("div", { class: "chips" });
-  chips.append(data.answered_from_context
+  chips.append(answer.answered_from_context
     ? chip("From the documents", "ok")
     : chip("No grounded answer", "warn"));
-  if (data.confidence) chips.append(chip(`confidence: ${data.confidence}`));
-  if (data.provider) chips.append(chip(`provider: ${data.provider}`));
-  const cached = typeof data.cached === "boolean" ? data.cached
-               : cacheHeader ? cacheHeader.toUpperCase() === "HIT" : null;
+  if (answer.confidence) chips.append(chip(`confidence: ${answer.confidence}`));
+  if (answer.provider || data.model) chips.append(chip(`provider: ${answer.provider || data.model}`));
+  const cached = typeof answer.cached === "boolean" ? answer.cached
+               : cacheHeader ? cacheHeader.toUpperCase() === "HIT"
+               : typeof data.cache === "string" ? data.cache.toLowerCase() === "hit" : null;
   if (cached !== null) chips.append(chip(cached ? "cache: hit" : "cache: miss"));
   card.append(chips);
 
-  card.append(el("p", { class: "text" }, data.answer ?? ""));
+  card.append(el("p", { class: "text" }, answer.answer ?? ""));
 
-  if (Array.isArray(data.citations) && data.citations.length) {
+  if (Array.isArray(answer.citations) && answer.citations.length) {
     card.append(el("h3", {}, "Sources"));
     const list = el("ol", { class: "cites" });
-    for (const c of data.citations) list.append(el("li", {}, cite(c)));
+    for (const c of answer.citations) list.append(el("li", {}, cite(c)));
     card.append(list);
   }
 
@@ -152,9 +157,10 @@ function renderAnswer(data, cacheHeader) {
     card.append(details);
   }
 
-  if (data.request_id) {
+  const requestId = data.request_id || data.trace_id;
+  if (requestId) {
     const meta = el("div", { class: "meta" }, "request id ");
-    meta.append(el("code", {}, data.request_id));
+    meta.append(el("code", {}, requestId));
     card.append(meta);
   }
   return card;
@@ -177,7 +183,7 @@ async function ask(question) {
   pending.scrollIntoView({ behavior: "smooth", block: "end" });
   send.disabled = true;
   try {
-    const res = await fetch(`${API_BASE}/api/ask`, {
+    const res = await fetch(`${API_BASE}${API_ENDPOINT}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ question }),
@@ -192,7 +198,7 @@ async function ask(question) {
     }
   } catch (err) {
     pending.remove();
-    thread.append(el("div", { class: "err" }, `Could not reach the API at ${API_BASE || location.origin}/api/ask.`));
+    thread.append(el("div", { class: "err" }, `Could not reach the API at ${API_BASE || location.origin}${API_ENDPOINT}.`));
   } finally {
     send.disabled = false;
     input.focus();

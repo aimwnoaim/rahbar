@@ -40,7 +40,7 @@ spec:
             name: ragops-config
         env:
         - name: CHROMA_COLLECTION
-          value: rahbar_v1_nomic
+          value: rahbar_kube_full_nomic
         - name: CHUNK_SIZE
           value: '400'
         - name: RAGOPS_READ_ONLY
