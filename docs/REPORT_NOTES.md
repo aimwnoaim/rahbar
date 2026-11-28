@@ -3,8 +3,8 @@
 ## Cover page
 
 **Project** RAHBAR, FAST-NUCES policy question answering  
-**Member 1** [Name] · [Roll number]  
-**Member 2** [Name] · [Roll number]
+**Member 1** `aimwnoaim` · **Roll number:** [fill from student record]
+**Member 2** `momnakhan24` · **Roll number:** [fill from student record]
 
 ## Figure 3 lifecycle mapping
 
@@ -26,7 +26,7 @@
 | Monitorability | Top-result similarity, abstention rate and latency by stage | `/metrics`, `python -m ragops metrics` |
 | Observability | Dropped suspicious retrievals, supported citations and cache outcomes | Trace entries and per-question evaluation details |
 | Traceability | Exact prompt hash, model revision, source version and access filters | `python -m ragops trace TRACE_ID` |
-| Reliability | Index orphan scan, PVC recovery and rolling update availability | Incremental results, fresh-cluster evidence pending |
+| Reliability | Index orphan scan, PVC recovery and rolling update availability | Incremental orphan checks, Chroma PVC restart, completed index recovery, rollout/undo evidence below |
 
 ## A. Verification and incremental indexing
 
@@ -131,12 +131,12 @@ The full before/after comparison includes the extra Batch B questions. The recor
 
 ## F. Kubernetes
 
-The fresh `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. Fixture ingestion ran in the Kubernetes Job. Live and candidate Deployments reached readiness, the API rejected a write attempt, and the fixture chunk survived a Chroma pod restart. The Kubernetes workloads called the pinned local Ollama through a temporary relay while the in-cluster Ollama image pull was stalled. [Ingest Job](../eval/results/k8s_fixture_ingest.json), [API write rejection](../eval/results/k8s_api_readonly.txt), [persistence](../eval/results/k8s_chroma_persistence.txt)
+The `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. Fixture ingestion ran in a Kubernetes Job. Live and candidate Deployments reached readiness, the API rejected a write attempt, and the fixture chunk survived a Chroma pod restart. During initial cluster setup, an image-pull delay required a temporary Ollama relay; final gate evidence was then produced with the in-cluster Ollama Deployment after model/vector parity was verified. [Ingest Job](../eval/results/k8s_fixture_ingest.json), [API write rejection](../eval/results/k8s_api_readonly.txt), [persistence](../eval/results/k8s_chroma_persistence.txt), [in-cluster model parity](../eval/results/k8s_model_embedding_parity.json)
 
 | Workload | Highest sampled CPU | Highest sampled memory | Resource request |
 | --- | ---: | ---: | --- |
-| Live API | 286m | 270 MiB | 300m CPU, 320 MiB |
-| Candidate API | 274m | 264 MiB | 300m CPU, 320 MiB |
+| Live API | 286m | 270 MiB in the fixture sample; later OOM-killed at 512 MiB during prolonged evaluation | 300m CPU, 512 MiB request, 1 GiB limit after the observed OOM |
+| Candidate API | 274m | 264 MiB in the fixture sample; readiness/liveness timeouts during prolonged evaluation | 300m CPU, 512 MiB request, 1 GiB limit after the observed timeout |
 | Chroma | 178m | 538 MiB sampled before full indexing | 200m CPU, 1024 MiB |
 | Eval Job | 0m | 25 MiB | 200m CPU, 128 MiB |
 | Unseen ingestion Job | — | 79.46 MiB peak RSS | 1500m CPU, 1280 MiB shared ingestion profile |
@@ -181,7 +181,7 @@ After undo, the unseen-batch Job verified and indexed the poster-printer policy.
 
 | Member | Work or review |
 | --- | --- |
-| Member 1 | [Confirm implemented, reviewed and demonstrated tasks] |
-| Member 2 | [Confirm implemented, reviewed and demonstrated tasks] |
+| `aimwnoaim` (Member 1) | Set up the repository, branch and protection evidence; reviewed and merged implementation through the fork workflow. Add any further work personally completed before submission. |
+| `momnakhan24` (Member 2) | Implemented and measured Assignment 03 with substantial Codex assistance; ran source checks, evaluation and Kubernetes experiments; recorded the resulting evidence. Add any further work personally completed before submission. |
 
-Codex assisted with implementation, original synthetic fixtures, documentation and execution. The project owner wrote the eight questions identified as human-authored. The team will record its contributions, review synthetic labels and demonstrate the Kubernetes flow.
+Codex assisted with implementation, original synthetic fixtures, documentation and command execution. The project owner wrote the eight questions identified as human-authored. The source checks and experiment outputs are recorded separately from human review. Before submission, the team must fill both student roll numbers, record the actual human review IDs in [GOLDEN_REVIEW.md](../eval/GOLDEN_REVIEW.md), and capture the requested appendix screenshots from its own current cluster and runs. The author metadata balance is not evidence of equal independent implementation; see [HISTORY-ATTRIBUTION.md](HISTORY-ATTRIBUTION.md) and [AI-USAGE.md](AI-USAGE.md).
