@@ -135,8 +135,8 @@ The `ragops-dev` Minikube profile bound the data, model and Chroma PVCs. Fixture
 
 | Workload | Highest sampled CPU | Highest sampled memory | Resource request |
 | --- | ---: | ---: | --- |
-| Live API | 286m | 270 MiB | 300m CPU, 320 MiB |
-| Candidate API | 274m | 264 MiB | 300m CPU, 320 MiB |
+| Live API | 286m | 270 MiB in the fixture sample; later OOM-killed at 512 MiB during prolonged evaluation | 300m CPU, 512 MiB request, 1 GiB limit after the observed OOM |
+| Candidate API | 274m | 264 MiB in the fixture sample; readiness/liveness timeouts during prolonged evaluation | 300m CPU, 512 MiB request, 1 GiB limit after the observed timeout |
 | Chroma | 178m | 538 MiB sampled before full indexing | 200m CPU, 1024 MiB |
 | Eval Job | 0m | 25 MiB | 200m CPU, 128 MiB |
 | Unseen ingestion Job | — | 79.46 MiB peak RSS | 1500m CPU, 1280 MiB shared ingestion profile |

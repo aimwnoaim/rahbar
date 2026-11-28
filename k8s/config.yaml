@@ -5,7 +5,7 @@ metadata:
   namespace: ragops
 data:
   EMBED_MODEL: nomic-embed-text
-  EMBEDDING_VERSION: 0a109f422b47
+  EMBEDDING_VERSION: 8688dbc0926c
   LLM_MODEL: qwen2.5:3b
   TEMPERATURE: '0'
   RELEVANCE_FLOOR: '0.60'

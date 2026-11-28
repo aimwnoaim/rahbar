@@ -1,201 +1,236 @@
-# Assignment 03 screenshots
+# Assignment 03 screenshots — Windows PowerShell
 
-Take each screenshot in a full terminal window. Keep the command and its output
-visible; do not crop or annotate. Type the item label (`A1`, `B1`, etc.) before each
-command. Use your own Minikube cluster and runs. Run these from the repo root in Bash.
+Run commands from the repository root in PowerShell. Keep the full terminal window
+visible with its command and output; do not crop or annotate. Use your own cluster and
+runs. Type each screenshot label (`A1`, `B1`, etc.) before its command.
 
-The commands below use the Assignment 03 context `ragops-dev` and namespace `ragops`.
-In the terminal, run this once to make the Kubernetes commands shorter:
+All Kubernetes commands use context `ragops-dev` and namespace `ragops`.
 
-```bash
-alias k='kubectl --context ragops-dev -n ragops'
-```
+## Start the port-forwards
 
-For B and D, open a second terminal and leave this running:
+Open two extra PowerShell windows and leave them running.
 
-```bash
+**Window 1 — candidate API**
+
+```powershell
 kubectl --context ragops-dev -n ragops port-forward service/candidate 18080:8000
 ```
+
+**Window 2 — Ollama**
+
+```powershell
+kubectl --context ragops-dev -n ragops port-forward service/ollama 11434:11434
+```
+
+In the PowerShell window where you run Python commands, set the Ollama URL. Repeat
+this whenever you open a new PowerShell window:
+
+```powershell
+$env:OLLAMA_URL = 'http://127.0.0.1:11434'
+```
+
+Check both connections before starting a long evaluation:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:18080/readyz
+(Invoke-RestMethod http://127.0.0.1:11434/api/tags).models | Select-Object name
+```
+
+The Ollama list must include `nomic-embed-text`.
 
 ## A — Batch checks and unchanged ingestion
 
 **A1 — Batch B verification report**
 
-```bash
-echo A1
-cat eval/results/verification_report_20261123T200954Z-f924f005.md
+```powershell
+Write-Output 'A1'
+Get-Content eval/results/verification_report_20261123T200954Z-f924f005.md
 ```
 
-This report is from the recorded Batch B run. For a newer run, use its report filename
-from `eval/results/`.
+For a newer Batch B run, show its report file from `eval/results` instead.
 
-**A2 — second ingestion, unchanged corpus**
+**A2 — second ingestion with the unchanged corpus**
 
-```bash
-echo A2
-k delete job ingest-unchanged --ignore-not-found
-k create job ingest-unchanged --from=cronjob/ingest
-k wait --for=condition=complete job/ingest-unchanged --timeout=40m
-k logs job/ingest-unchanged
+```powershell
+Write-Output 'A2'
+kubectl --context ragops-dev -n ragops delete job ingest-unchanged --ignore-not-found
+kubectl --context ragops-dev -n ragops create job ingest-unchanged --from=cronjob/ingest
+kubectl --context ragops-dev -n ragops wait --for=condition=complete job/ingest-unchanged --timeout=40m
+kubectl --context ragops-dev -n ragops logs job/ingest-unchanged
 ```
 
-Show that it embedded zero chunks and passed the orphan check.
+Show zero chunks embedded and the passing orphan check.
 
-## B — evaluation summary
+## B — all three evaluation levels
 
-**B1 — embedding/module, retrieval, and end-to-end results**
+The candidate Service in this namespace currently serves a small fixture collection.
+The full-corpus baseline and passing 420-word candidate were already evaluated in the
+recorded run below. Use that complete measured comparison for B1; do not run the
+29-question suite against the fixture Service.
 
-```bash
-echo B1
-python -m ragops eval --collection rahbar_v3_nomic --target-url http://localhost:18080 --out eval/results --label appendix
+**B1 — embedding/module, retrieval, and end-to-end summary from the full-corpus run**
+
+```powershell
+Write-Output 'B1'
+Get-Content eval/results/comparison_candidate_420.md
 ```
 
-The command prints the result file path. Open its matching `.md` summary in the terminal
-if needed so all three evaluation levels are visible.
+This file contains the embedding/module, retrieval, and end-to-end metrics from the
+team's full-corpus baseline and passing candidate runs.
 
 ## C — release gate
 
-Use the baseline and candidate results from your own runs. These are the recorded
-examples; replace the paths if you make new runs.
+These are the recorded examples. For a new run, substitute its matching result paths.
 
 **C1 — failing candidate**
 
-```bash
-echo C1
+```powershell
+Write-Output 'C1'
 python -m ragops gate --baseline eval/results/eval_20261123T200917344381Z_batch_a.json --candidate eval/results/eval_20261123T203508248109Z_candidate.json --config config/gate.yaml
 ```
 
 **C2 — passing candidate**
 
-```bash
-echo C2
+```powershell
+Write-Output 'C2'
 python -m ragops gate --baseline eval/results/eval_20261123T200917344381Z_batch_a.json --candidate eval/results/eval_20261123T205940178644Z_candidate_420.json --config config/gate.yaml
 ```
 
-The output should say `REJECT` for C1 and `RELEASE` for C2.
+Expected output: `REJECT` for C1 and `RELEASE` for C2.
 
 ## D — trace and prompt reconstruction
 
-For **D1**, send a query to the candidate service. The response includes the complete
-trace. Use the planted locker instruction question if you need to show the guardrail.
+**D1 — full trace from a new query**
 
-```bash
-echo D1
-curl -fsS -X POST http://localhost:18080/query -H 'Content-Type: application/json' -d '{"question":"How long can I borrow an audio recorder from the media desk?"}'
+```powershell
+Write-Output 'D1'
+$trace = Invoke-RestMethod -Uri http://127.0.0.1:18080/query -Method Post -ContentType 'application/json' -Body '{"question":"How long can I borrow an audio recorder from the media desk?"}'
+$trace | ConvertTo-Json -Depth 20
 ```
 
-Copy the `trace_id` from that output. For **D2**, replace `PASTE_TRACE_ID` below:
+Copy the `trace_id`. For **D2**, replace `PASTE_TRACE_ID` with that value:
 
-```bash
-echo D2
-k exec deploy/api -- python -m ragops trace PASTE_TRACE_ID
+```powershell
+Write-Output 'D2'
+kubectl --context ragops-dev -n ragops exec deployment/api -- python -m ragops trace PASTE_TRACE_ID
 ```
 
-## E — coverage before and after adding questions
+Use the locker question in D1 when you want the trace to show the injected-content rail.
+
+## E — coverage before and after expansion
+
+Set `$env:OLLAMA_URL` as shown above in this same PowerShell window. After Python exits,
+`$LASTEXITCODE` contains its real process exit code.
 
 **E1 — original question set**
 
-```bash
-echo E1
+```powershell
+Write-Output 'E1'
 python -m ragops coverage --live eval/live_queries.jsonl --golden eval/golden.jsonl --threshold 0.5409877865338792
-echo "exit code: $?"
+$coverageExit = $LASTEXITCODE
+Write-Output "exit code: $coverageExit"
 ```
 
 **E2 — expanded question set**
 
-```bash
-echo E2
+```powershell
+Write-Output 'E2'
 python -m ragops coverage --live eval/live_queries.jsonl --golden eval/golden_expanded.jsonl --threshold 0.5409877865338792
-echo "exit code: $?"
+$coverageExit = $LASTEXITCODE
+Write-Output "exit code: $coverageExit"
 ```
 
-Expected recorded results are 65% / exit 1 before, and 100% / exit 0 after. Mention
-that the expanded result is in-sample because those questions were chosen from uncovered
-live topics.
+Recorded results were 65% / exit 1 before and 100% / exit 0 after. Call the expanded
+result in-sample because the added questions were selected from uncovered live topics.
 
-## F — Kubernetes deployment and rollback
+## F — Kubernetes evidence
 
-**F1 — namespace resources**
+**F1 — resources in the namespace**
 
-```bash
-echo F1
-k get all,pvc,configmap,cronjob,job
+```powershell
+Write-Output 'F1'
+kubectl --context ragops-dev -n ragops get all,pvc,configmap,cronjob,job
 ```
 
 **F2 — completed ingestion Job**
 
-```bash
-echo F2
-k get jobs
-k logs job/ingest
+```powershell
+Write-Output 'F2'
+kubectl --context ragops-dev -n ragops get jobs
+kubectl --context ragops-dev -n ragops logs job/ingest
 ```
 
 **F3 — completed evaluation Job**
 
-```bash
-echo F3
-k get jobs
-k logs job/eval
+```powershell
+Write-Output 'F3'
+kubectl --context ragops-dev -n ragops get jobs
+kubectl --context ragops-dev -n ragops logs job/eval-optimized
 ```
 
-If your Jobs have different names, use the names shown by `k get jobs`.
+If a Job has a different name, use the name shown by `get jobs`.
 
-**F4 — gate changes after editing the ConfigMap**
+**F4 — gate outcomes after a ConfigMap-only edit**
 
-First show the current setting, then edit it:
+Show the current ConfigMap and both recorded Kubernetes gate Jobs. The strict job failed;
+the restored job passed. The same recorded candidate was used, without rebuilding the
+image.
 
-```bash
-echo F4-before
-k get configmap gate-config -o yaml
-k edit configmap gate-config
+```powershell
+Write-Output 'F4-before'
+kubectl --context ragops-dev -n ragops get configmap gate-config -o yaml
+kubectl --context ragops-dev -n ragops logs job/eval-fixture-strict
+kubectl --context ragops-dev -n ragops logs job/eval-fixture-restored
 ```
 
-Set `p95_latency_baseline_factor` to `0`, save, then run these commands. The gate Job
-should fail. No image rebuild is needed.
+**F5 — rollout, undo, and a new trace afterwards**
 
-```bash
-k delete job eval --ignore-not-found
-k apply -f k8s/eval-job.yaml
-k wait --for=condition=failed job/eval --timeout=40m
-k logs job/eval
+Open another PowerShell window and leave this API port-forward running:
+
+```powershell
+kubectl --context ragops-dev -n ragops port-forward service/api 18081:8000
 ```
 
-Restore the original ConfigMap and rerun the Job to show the passing result:
+In the screenshot window, perform the bad rollout and undo:
 
-```bash
-k apply -f k8s/config.yaml
-k delete job eval --ignore-not-found
-k apply -f k8s/eval-job.yaml
-k wait --for=condition=complete job/eval --timeout=40m
-k logs job/eval
+```powershell
+Write-Output 'F5'
+kubectl --context ragops-dev -n ragops rollout status deployment/api
+kubectl --context ragops-dev -n ragops set env deployment/api CHROMA_COLLECTION=rahbar_kube_v1_nomic CHUNK_SIZE=400 TOP_K=1
+kubectl --context ragops-dev -n ragops rollout status deployment/api
+kubectl --context ragops-dev -n ragops rollout undo deployment/api
+kubectl --context ragops-dev -n ragops rollout status deployment/api
 ```
 
-**F5 — rollout, undo, and a new trace after undo**
+Query the rolled-back API, copy its trace ID, then inspect that new trace. It should
+show the restored collection and embedding version:
 
-```bash
-echo F5-rollout
-k rollout status deployment/api
-k set env deployment/api CHROMA_COLLECTION=rahbar_kube_v1_nomic CHUNK_SIZE=400 TOP_K=1
-k rollout status deployment/api
-k rollout undo deployment/api
-k rollout status deployment/api
+```powershell
+$trace = Invoke-RestMethod -Uri http://127.0.0.1:18081/query -Method Post -ContentType 'application/json' -Body '{"question":"How long can I borrow an audio recorder from the media desk?"}'
+$trace | Select-Object trace_id,collection,embedding_version
+kubectl --context ragops-dev -n ragops exec deployment/api -- python -m ragops trace PASTE_NEW_TRACE_ID
 ```
 
-Send a fresh question to the API and copy the new `trace_id` from its output:
+## If a live API request disconnects
 
-```bash
-curl -fsS -X POST http://localhost:18080/query -H 'Content-Type: application/json' -d '{"question":"How long can I borrow an audio recorder from the media desk?"}'
+For a fresh query or evaluation (the recorded B1 summary above is a local file), check
+the candidate and Ollama pods and recent logs:
+
+```powershell
+kubectl --context ragops-dev -n ragops get pods
+kubectl --context ragops-dev -n ragops logs deployment/candidate --tail=80
+kubectl --context ragops-dev -n ragops logs deployment/ollama --tail=80
 ```
 
-Then show its trace. It must show the restored collection and embedding version:
+If the candidate restarted, check its previous log:
 
-```bash
-k exec deploy/api -- python -m ragops trace PASTE_NEW_TRACE_ID
+```powershell
+kubectl --context ragops-dev -n ragops logs deployment/candidate --previous --tail=80
 ```
 
 ## Before submitting
 
-Have a team member manually check at least eight synthetic questions against their
-source pages. Update `reviewed`, `review_status`, and reviewer notes in both golden
-files. Record the IDs in [GOLDEN_REVIEW.md](../eval/GOLDEN_REVIEW.md). Do not label
-Codex's source checks as human review.
+A team member must manually check at least eight synthetic questions against the source
+pages. Update `reviewed`, `review_status`, and reviewer notes in both golden files, then
+record the IDs in [GOLDEN_REVIEW.md](../eval/GOLDEN_REVIEW.md). Codex source checks do
+not count as human review.
