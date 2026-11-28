@@ -14,17 +14,22 @@ Review each source independently and record only rows actually checked by a pers
 5. Apply the same review fields to matching rows in `golden_expanded.jsonl`, preserving
    the question and source labels. Do not mark a row reviewed in one file only.
 
-Suggested first eight to check: `rgo-01`–`rgo-08`. Open the pinned source in
-`corpus/raw/` or the authored fixture named in the row; verify the exact page and hint.
-For example, `rgo-02` says “100%” for attendance, while the source also notes a
-possible HoD exception. Decide whether the hint and question represent that clause
-fairly before marking it reviewed. Correct a label if the source shows it is wrong and
-describe the correction in `notes`.
+## Human review record
 
-## Human-written questions
+Reviewer: Momna Khan, 2026-11-28. Each label below was checked by hand against the pinned corpus, not by Codex. Both `golden.jsonl` and `golden_expanded.jsonl` carry `reviewed: true` and `review_status: human_reviewed` for these rows.
 
-Rows `human-01` through `human-08` preserve the project owner's question wording. Codex checked the source labels. The credit-limit and total-degree-fee questions are abstention cases because the request lacks necessary program details. The accessibility question uses the exam-seating fixture in the Batch B split. Team review of the synthetic rows remains open.
+Reviewed rows: `rgo-09`, `rgo-10`, `rgo-11`, `rgo-12`, `rgo-13`, `rgo-14`, `rgo-15`, `rgo-21`, `rgo-22`.
 
-Codex checked the answer hints for `rgo-01` through `rgo-08` against the specified handbook pages. These rows use `source_checked_by_codex` in `review_status`. The [source check record](source_checks.json) lists the results.
+| ID | Source checked | Finding |
+|---|---|---|
+| rgo-09 | handbook p28, clause 6.2 | Only repeat courses are allowed; no new courses. |
+| rgo-10 | handbook p29, clause 6.10 | No fee concession in the summer semester. |
+| rgo-11 | handbook p24, clause 5.6 | CGPA below 2.00 for 3 consecutive semesters closes admission. |
+| rgo-12 | handbook p12, grade table | A+ is 4.00. |
+| rgo-13 | fee-structure page | BBA / BS row is Rs. 12,000 per credit hour. |
+| rgo-14 | grading page | A+ is 4.00. |
+| rgo-15 | data/batch_a/equipment-loan.md | Audio recorders are lent for three working days. |
+| rgo-21 | data/batch_a/equipment-loan.md | The borrowing period starts at pickup. |
+| rgo-22 | handbook p28, clause 6.2 | Rule covers all four categories, including graduating students; no new courses. |
 
-Faithfulness uses a cited-excerpt overlap proxy, so LLM judge agreement is outside this evaluator.
+Rows `rgo-01` to `rgo-08` remain `source_checked_by_codex` and do not count towards the review. The other pending rows (`rgo-16` to `rgo-20`, `rgo-23` to `rgo-26`) were not reviewed.
