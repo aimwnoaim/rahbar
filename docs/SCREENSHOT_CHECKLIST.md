@@ -1,215 +1,201 @@
-# Assignment 03 screenshot appendix
+# Assignment 03 screenshots
 
-Capture each item from a terminal on the submitting team's own Minikube cluster and
-own run. Keep the full terminal window visible, including the command and all output;
-do not crop, annotate, or substitute a stored result for a required live-cluster
-screenshot. Use one terminal window per screenshot when output is long. Type the item
-label (for example `B3`) as a visible command immediately before the evidence.
+Take each screenshot in a full terminal window. Keep the command and its output
+visible; do not crop or annotate. Type the item label (`A1`, `B1`, etc.) before each
+command. Use your own Minikube cluster and runs. Run these from the repo root in Bash.
 
-These commands use Bash from the repository root. They target only Minikube profile
-and kubectl context `ragops-dev`, namespace `ragops`; do not mix them with the separate
-Assignment 02 `rahbar` profile. Start the RAGOps environment using [k8s/README.md](../k8s/README.md).
+The commands below use the Assignment 03 context `ragops-dev` and namespace `ragops`.
+In the terminal, run this once to make the Kubernetes commands shorter:
 
 ```bash
-k=(kubectl --context ragops-dev -n ragops)
+alias k='kubectl --context ragops-dev -n ragops'
 ```
 
-## A — verification and incremental indexing
+For B and D, open a second terminal and leave this running:
 
-**A1 — Batch B checks and quarantine reasons.** Use the verification report from the
-Batch B run performed on your cluster. The report lists each check's pass/fail result,
-the outcome, and the reason for quarantine.
+```bash
+kubectl --context ragops-dev -n ragops port-forward service/candidate 18080:8000
+```
+
+## A — Batch checks and unchanged ingestion
+
+**A1 — Batch B verification report**
 
 ```bash
 echo A1
 cat eval/results/verification_report_20261123T200954Z-f924f005.md
 ```
 
-For a newly captured run, replace that filename with the run ID printed by the ingest
-Job. Do not present the committed historical report as a new run.
+This report is from the recorded Batch B run. For a newer run, use its report filename
+from `eval/results/`.
 
-**A2 — unchanged second ingestion.** After the Batch A corpus is loaded and the first
-ingestion Job completes, run the same Job template again without changing `/data/inbox`.
-Keep the second run's Job name unique:
+**A2 — second ingestion, unchanged corpus**
 
 ```bash
 echo A2
-job="ingest-unchanged-$(date +%Y%m%d%H%M%S)"
-"${k[@]}" create job "$job" --from=cronjob/ingest
-"${k[@]}" wait --for=condition=complete "job/$job" --timeout=40m
-"${k[@]}" logs "job/$job"
+k delete job ingest-unchanged --ignore-not-found
+k create job ingest-unchanged --from=cronjob/ingest
+k wait --for=condition=complete job/ingest-unchanged --timeout=40m
+k logs job/ingest-unchanged
 ```
 
-The output must show `chunks_embedded: 0` and a passing orphan check. If the CronJob
-does not exist yet, apply `k8s/ingest-cronjob.yaml` after completing the setup steps.
+Show that it embedded zero chunks and passed the orphan check.
 
-## B — three-level evaluation
+## B — evaluation summary
 
-**B1 — evaluation summary.** Run against your current candidate Service and show the
-module/embedding, retrieval, and end-to-end sections in the timestamped summary.
+**B1 — embedding/module, retrieval, and end-to-end results**
 
 ```bash
 echo B1
 python -m ragops eval --collection rahbar_v3_nomic --target-url http://localhost:18080 --out eval/results --label appendix
 ```
 
-Before running, start `kubectl --context ragops-dev -n ragops port-forward service/candidate 18080:8000`
-in another terminal. Use the generated JSON/Markdown path printed by the command and
-display its summary in the same terminal if it does not fit in the current viewport.
+The command prints the result file path. Open its matching `.md` summary in the terminal
+if needed so all three evaluation levels are visible.
 
-## C — regression gate
+## C — release gate
 
-The checked-in evidence uses a 600-word candidate that fails and a 420-word candidate
-that passes. For screenshot-grade evidence, run these commands against the matching
-baseline/candidate result files produced by your current cluster. Confirm both files
-are in the same split and are from the same evaluator version.
+Use the baseline and candidate results from your own runs. These are the recorded
+examples; replace the paths if you make new runs.
+
+**C1 — failing candidate**
 
 ```bash
 echo C1
-python -m ragops gate --baseline eval/results/eval_20261123T200917344381Z_batch_a.json --candidate eval/results/eval_20261123T203508248109Z_candidate.json --config config/gate.yaml; test "$?" -eq 1
+python -m ragops gate --baseline eval/results/eval_20261123T200917344381Z_batch_a.json --candidate eval/results/eval_20261123T203508248109Z_candidate.json --config config/gate.yaml
 ```
+
+**C2 — passing candidate**
 
 ```bash
 echo C2
 python -m ragops gate --baseline eval/results/eval_20261123T200917344381Z_batch_a.json --candidate eval/results/eval_20261123T205940178644Z_candidate_420.json --config config/gate.yaml
 ```
 
-The commands above replay recorded results. For the assignment's own-cluster screenshot,
-use the corresponding current-run result paths instead; the terminal must show `REJECT`
-for C1 and `RELEASE` for C2.
+The output should say `REJECT` for C1 and `RELEASE` for C2.
 
 ## D — trace and prompt reconstruction
 
-**D1 — one complete trace from a fresh query.** Start the API port-forward in another
-terminal and query it; this prints the full trace record, including guardrail actions,
-collection, model version, and prompt hash.
+For **D1**, send a query to the candidate service. The response includes the complete
+trace. Use the planted locker instruction question if you need to show the guardrail.
 
 ```bash
 echo D1
-curl -fsS -X POST http://127.0.0.1:18080/query -H 'Content-Type: application/json' -d '{"question":"How long can I borrow an audio recorder from the media desk?"}' | tee /tmp/ragops-trace.json
+curl -fsS -X POST http://localhost:18080/query -H 'Content-Type: application/json' -d '{"question":"How long can I borrow an audio recorder from the media desk?"}'
 ```
 
-**D2 — trace tool rebuilding the prompt.** Use the `trace_id` printed by the D1 query.
+Copy the `trace_id` from that output. For **D2**, replace `PASTE_TRACE_ID` below:
 
 ```bash
 echo D2
-trace_id=$(python -c 'import json; print(json.load(open("/tmp/ragops-trace.json"))["trace_id"])')
-"${k[@]}" exec deploy/api -- python -m ragops trace "$trace_id"
+k exec deploy/api -- python -m ragops trace PASTE_TRACE_ID
 ```
 
-For the planted Batch B instruction, query the locker question and show the trace's
-`guardrail_actions` entry with `action: drop` before taking the D2 screenshot.
+## E — coverage before and after adding questions
 
-## E — live-question coverage
-
-Capture coverage before and after adding the new questions using the calibrated value
-and the two committed golden files. The initial set should fail the threshold; the
-expanded set should pass. Preserve the exit code visibly.
+**E1 — original question set**
 
 ```bash
-echo E1-before
-python -m ragops coverage --live eval/live_queries.jsonl --golden eval/golden.jsonl --threshold 0.5409877865338792; echo "exit=$?"
+echo E1
+python -m ragops coverage --live eval/live_queries.jsonl --golden eval/golden.jsonl --threshold 0.5409877865338792
+echo "exit code: $?"
 ```
+
+**E2 — expanded question set**
 
 ```bash
-echo E2-after
-python -m ragops coverage --live eval/live_queries.jsonl --golden eval/golden_expanded.jsonl --threshold 0.5409877865338792; echo "exit=$?"
+echo E2
+python -m ragops coverage --live eval/live_queries.jsonl --golden eval/golden_expanded.jsonl --threshold 0.5409877865338792
+echo "exit code: $?"
 ```
 
-The recorded outcomes are 65% before (exit 1) and 100% after (exit 0). State that this
-expanded-set score is in-sample because the added questions were selected from uncovered
-live-query topics.
+Expected recorded results are 65% / exit 1 before, and 100% / exit 0 after. Mention
+that the expanded result is in-sample because those questions were chosen from uncovered
+live topics.
 
-## F — Kubernetes runtime and release evidence
+## F — Kubernetes deployment and rollback
 
-Every F screenshot must be captured against your running `ragops-dev` profile. Confirm
-the context before collecting anything:
-
-```bash
-echo F0
-kubectl config current-context
-```
-
-**F1 — inventory** (include all resource kinds requested in the brief):
+**F1 — namespace resources**
 
 ```bash
 echo F1
-"${k[@]}" get all,pvc,configmap,cronjob,job -o wide
+k get all,pvc,configmap,cronjob,job
 ```
 
-**F2 — completed ingestion Job logs:**
+**F2 — completed ingestion Job**
 
 ```bash
 echo F2
-"${k[@]}" get jobs
-"${k[@]}" logs job/ingest
+k get jobs
+k logs job/ingest
 ```
 
-**F3 — completed evaluation Job logs and gate outcome:**
+**F3 — completed evaluation Job**
 
 ```bash
 echo F3
-"${k[@]}" get jobs
-"${k[@]}" logs job/eval
+k get jobs
+k logs job/eval
 ```
 
-If you used different Job names, substitute the completed run's actual names.
+If your Jobs have different names, use the names shown by `k get jobs`.
 
-**F4 — ConfigMap-only gate flip:** capture the active threshold, edit one threshold,
-rerun the evaluation Job, and show the changed result. Do not rebuild the image. Record
-the original ConfigMap values first so you can restore them afterward.
+**F4 — gate changes after editing the ConfigMap**
+
+First show the current setting, then edit it:
 
 ```bash
 echo F4-before
-"${k[@]}" get configmap gate-config -o yaml
+k get configmap gate-config -o yaml
+k edit configmap gate-config
 ```
 
-Use `kubectl --context ragops-dev -n ragops edit configmap gate-config` to change a
-threshold (for the recorded strict demo, set `p95_latency_baseline_factor: 0`), then
-delete and recreate the eval Job from the manifest and show its logs:
+Set `p95_latency_baseline_factor` to `0`, save, then run these commands. The gate Job
+should fail. No image rebuild is needed.
 
 ```bash
-"${k[@]}" delete job eval --ignore-not-found
-"${k[@]}" apply -f k8s/eval-job.yaml
-"${k[@]}" wait --for=condition=complete job/eval --timeout=40m || "${k[@]}" wait --for=condition=failed job/eval --timeout=40m
-"${k[@]}" logs job/eval
+k delete job eval --ignore-not-found
+k apply -f k8s/eval-job.yaml
+k wait --for=condition=failed job/eval --timeout=40m
+k logs job/eval
 ```
 
-For a failing gate, the Job is expected to fail, so the `||` branch waits for its
-failed condition. Restore the exact original ConfigMap from `k8s/config.yaml` with
-`kubectl --context ragops-dev -n ragops apply -f k8s/config.yaml`, delete/recreate the
-Job, and capture the restored gate result. No image rebuild is involved.
+Restore the original ConfigMap and rerun the Job to show the passing result:
 
-**F5 — rollout, undo, and a post-undo trace:**
+```bash
+k apply -f k8s/config.yaml
+k delete job eval --ignore-not-found
+k apply -f k8s/eval-job.yaml
+k wait --for=condition=complete job/eval --timeout=40m
+k logs job/eval
+```
+
+**F5 — rollout, undo, and a new trace after undo**
 
 ```bash
 echo F5-rollout
-"${k[@]}" rollout status deployment/api --timeout=5m
-"${k[@]}" rollout history deployment/api
+k rollout status deployment/api
+k set env deployment/api CHROMA_COLLECTION=rahbar_kube_v1_nomic CHUNK_SIZE=400 TOP_K=1
+k rollout status deployment/api
+k rollout undo deployment/api
+k rollout status deployment/api
 ```
 
-For the controlled bad release, set the measured bad top-k/collection configuration
-and wait for rollout before undoing it. Then query the API again and rebuild the trace.
-The final trace must show the collection and embedding version restored by undo.
+Send a fresh question to the API and copy the new `trace_id` from its output:
 
 ```bash
-echo F5-undo
-"${k[@]}" set env deployment/api CHROMA_COLLECTION=rahbar_kube_v1_nomic CHUNK_SIZE=400 TOP_K=1
-"${k[@]}" rollout status deployment/api --timeout=5m
-"${k[@]}" rollout undo deployment/api
-"${k[@]}" rollout status deployment/api --timeout=5m
+curl -fsS -X POST http://localhost:18080/query -H 'Content-Type: application/json' -d '{"question":"How long can I borrow an audio recorder from the media desk?"}'
 ```
 
-Start the API port-forward in another terminal, issue the same query as D1, extract its
-new trace ID, and run `python -m ragops trace "$trace_id"` inside the API pod as in D2.
-Use the new post-undo trace ID, not a historical trace.
+Then show its trace. It must show the restored collection and embedding version:
 
-## Human review before submission
+```bash
+k exec deploy/api -- python -m ragops trace PASTE_NEW_TRACE_ID
+```
 
-The current golden file has eight human-authored questions, but the 26 synthetic
-questions are not human reviewed. A team member must check at least eight synthetic
-rows against the pinned source document/page, then update both `eval/golden.jsonl` and
-`eval/golden_expanded.jsonl` consistently: set `reviewed` to `true`, set
-`review_status` to `human_reviewed`, and identify the human reviewer in `notes`.
-Record which IDs were checked in [GOLDEN_REVIEW.md](../eval/GOLDEN_REVIEW.md). Do not
-mark Codex's checks as human review.
+## Before submitting
+
+Have a team member manually check at least eight synthetic questions against their
+source pages. Update `reviewed`, `review_status`, and reviewer notes in both golden
+files. Record the IDs in [GOLDEN_REVIEW.md](../eval/GOLDEN_REVIEW.md). Do not label
+Codex's source checks as human review.
